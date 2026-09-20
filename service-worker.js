@@ -1,16 +1,24 @@
 /* =========================================================
    SPB · Programación de Traslado — Service Worker
    ---------------------------------------------------------
-   IMPORTANTE: cada vez que subas una nueva versión del HTML
-   (o de este mismo archivo), sube también el número de
-   CACHE_VERSION de abajo. Eso hace que:
-     - se borre la caché vieja automáticamente
-     - todos los que tengan la PWA instalada reciban la
-       versión nueva la próxima vez que abran la app
-       (con conexión a internet), sin tener que desinstalar
-       ni reinstalar nada.
+   Cómo se actualiza el sistema solo, sin pasos manuales:
+
+   1) Cuando abres o refrescas la app con internet, SIEMPRE se
+      pide el index.html más nuevo directo al servidor (no se
+      usa la copia guardada). Por eso cualquier cambio de texto,
+      botones, reglas, etc. ya se ve apenas recargas, aunque
+      este archivo no cambie para nada.
+
+   2) CACHE_VERSION de abajo solo sirve para dos cosas extra:
+      limpiar cachés viejas y avisarle a una pestaña que ya
+      tenías abierta que hay versión nueva para que se recargue
+      sola (ver el mensaje SPB_SW_UPDATED más abajo). Ya no hay
+      que llevar la cuenta a mano: el número es la fecha/hora
+      de la última edición, y se actualiza automáticamente cada
+      vez que Claude (o quien edite el código) guarda un cambio
+      en index.html o en este archivo.
 ========================================================= */
-const CACHE_VERSION = 'v16';
+const CACHE_VERSION = 'v20260920-2';
 const CACHE_NAME = 'spb-traslado-' + CACHE_VERSION;
 
 const PRECACHE_URLS = [
