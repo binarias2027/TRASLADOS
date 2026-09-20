@@ -2476,7 +2476,11 @@
 
   async function ofrecerEnviarCorreoCargue(r, tt, lineas){
     var correo = (configEmailCache || '').trim();
-    if(!correo || !lineas.length) return;
+    if(!lineas.length) return;
+    if(!correo){
+      showToast('Cargue confirmado. (No hay correo de aviso configurado: el Admin puede configurarlo en "Correo para aviso de cargue".)');
+      return;
+    }
     var ok = await customConfirm('Cargue confirmado. ¿Enviar un correo con el resumen a '+correo+'?');
     if(!ok) return;
     var asunto = 'Cargue TT# '+tt.codigo+' - '+r.origen+' a '+r.destino;
