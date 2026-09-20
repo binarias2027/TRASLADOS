@@ -1118,6 +1118,10 @@
           <button class="btn" id="btnGuardarCorreoCargue" type="button">Guardar</button>
         </div>
       </div>
+      <div class="field" style="margin-top:10px;">
+        <label>Firma que va al final del correo</label>
+        <textarea id="fFirmaCargue" rows="8" style="width:100%;box-sizing:border-box;font-family:inherit;font-size:13px;padding:9px 10px;border:1px solid var(--line-strong);border-radius:7px;"></textarea>
+      </div>
       <p class="empty-inline" id="correoCargueEstado"></p>
       </div>
     </div>
@@ -2389,6 +2393,18 @@
   var CONFIG_TABLE = 'configuracion';
   var CONFIG_CORREO_ID = 'correo_cargue';
   var configEmailCache = '';
+  var configFirmaCache = '';
+
+  var FIRMA_DEFAULT = [
+    'AIDE CHAVARRIA',
+    'Grupo Inspecciones',
+    'Dirección de Planeación y Operaciones',
+    'Phone: (57) (2) 24 10700 al 09 Ext: 4510',
+    'Mobile: 3176350721',
+    'Email: inspecciones@sprbun.com',
+    'Terminal Marítimo',
+    'www.sprbun.com'
+  ].join('\n');
 
   function loadConfigEmailLocal(){
     try{ return localStorage.getItem('spb_correo_cargue') || ''; }catch(e){ return ''; }
@@ -2396,9 +2412,20 @@
   function saveConfigEmailLocal(v){
     try{ localStorage.setItem('spb_correo_cargue', v); }catch(e){}
   }
+  function loadConfigFirmaLocal(){
+    try{
+      var v = localStorage.getItem('spb_firma_cargue');
+      return (v === null) ? FIRMA_DEFAULT : v;
+    }catch(e){ return FIRMA_DEFAULT; }
+  }
+  function saveConfigFirmaLocal(v){
+    try{ localStorage.setItem('spb_firma_cargue', v); }catch(e){}
+  }
   function pintarCorreoCargueUI(){
     var inp = document.getElementById('fCorreoCargue');
     if(inp && document.activeElement !== inp) inp.value = configEmailCache;
+    var firmaInp = document.getElementById('fFirmaCargue');
+    if(firmaInp && document.activeElement !== firmaInp) firmaInp.value = configFirmaCache;
   }
   function esCorreoValido(v){
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
@@ -2406,6 +2433,7 @@
 
   async function initConfigEmail(){
     configEmailCache = loadConfigEmailLocal();
+    configFirmaCache = loadConfigFirmaLocal();
     pintarCorreoCargueUI();
     if(!db) return;
     try{
@@ -2413,11 +2441,16 @@
         var doc = (snap.docs || []).find(function(d){ return d.id === CONFIG_CORREO_ID; });
         if(!doc) return;
         var data = doc.data();
-        if(data && typeof data.email === 'string'){
+        if(!data) return;
+        if(typeof data.email === 'string'){
           configEmailCache = data.email;
           saveConfigEmailLocal(configEmailCache);
-          pintarCorreoCargueUI();
         }
+        if(typeof data.firma === 'string'){
+          configFirmaCache = data.firma;
+          saveConfigFirmaLocal(configFirmaCache);
+        }
+        pintarCorreoCargueUI();
       }, function(err){
         console.warn('No se pudo sincronizar el correo de cargue (revisa la tabla "configuracion" en Supabase):', err);
       });
@@ -2426,21 +2459,25 @@
 
   async function guardarCorreoCargue(){
     var inp = document.getElementById('fCorreoCargue');
+    var firmaInp = document.getElementById('fFirmaCargue');
     var estado = document.getElementById('correoCargueEstado');
     var val = inp.value.trim();
+    var firmaVal = firmaInp.value;
     if(val && !esCorreoValido(val)){
       showToast('Escribe un correo válido.');
       return;
     }
     configEmailCache = val;
+    configFirmaCache = firmaVal;
     saveConfigEmailLocal(val);
+    saveConfigFirmaLocal(firmaVal);
     if(!db){
       if(estado) estado.textContent = 'Guardado en este dispositivo.';
       showToast('Correo guardado en este dispositivo.');
       return;
     }
     try{
-      await db.collection(CONFIG_TABLE).doc(CONFIG_CORREO_ID).set({email: val});
+      await db.collection(CONFIG_TABLE).doc(CONFIG_CORREO_ID).set({email: val, firma: firmaVal});
       if(estado) estado.textContent = 'Guardado: se usará en todos los dispositivos.';
       showToast('Correo guardado.');
     }catch(e){
@@ -2460,17 +2497,24 @@
 
   function buildCargueEmailText(r, tt, lineas){
     var lines = [];
-    lines.push('Buen día,');
+    lines.push('Buen día');
+    lines.push('Sres. Seguridad');
     lines.push('');
-    lines.push('Se confirmó el cargue del TT# '+tt.codigo+' ('+tt.operador+', CC '+tt.cc+') '+
-      'para el traslado de '+r.origen+' a '+r.destino+(r.fecha ? ' - Fecha: '+fmtFecha(r.fecha) : '')+'.');
+    lines.push('Permitir salida e ingreso por zona franca al siguiente TT# '+tt.codigo+
+      ' para traslado de carga suelta desde '+r.origen+' hacia '+r.destino+'.');
     lines.push('');
-    lines.push('Bl        Cant.');
-    lineas.forEach(function(l){ lines.push(l.bl+'        '+l.cantidad); });
+    lines.push('TT'+tt.codigo);
+    lines.push('OPERADOR: '+tt.operador);
+    lines.push('CC '+tt.cc);
     lines.push('');
-    lines.push('Cargado por: '+(currentSession ? currentSession.nombre : '-'));
+    lines.push('BL                   Cant.');
+    lineas.forEach(function(l){ lines.push(l.bl+'           '+l.cantidad); });
     lines.push('');
-    lines.push('Quedamos atentos.');
+    lines.push('Cordial Saludo');
+    if(configFirmaCache){
+      lines.push('');
+      lines.push(configFirmaCache);
+    }
     return lines.join('\n');
   }
 
