@@ -829,6 +829,19 @@
     .card-sec{border-left-width:4px;}
     .card-sec > h2, .card-sec > h3.card-title{font-size:12.5px;margin-bottom:12px;padding-bottom:8px;}
 
+    /* Quitamos los bordes de las tarjetas en celular: se apoyan solo en
+       fondo + sombra suave, así se ven más limpias y ocupan mejor el ancho. */
+    .panel{border:none;}
+    .rec-card{border:none;}
+    .tt-programado-item, .usuario-item{border:none;}
+    .rec-tt.rec-sec{border:none;border-left:4px solid var(--acc);}
+    .rec-sec .tt-op-row,
+    .rec-sec .tt-programado-item,
+    .rec-sec .bl-row,
+    .rec-sec .carga-row,
+    .cargue-item,
+    .carga-bl-row{border:none;}
+
     /* Pestañas (Programar traslado / Programaciones, Administrador / Operativo / Ver) */
     .role-switch{width:100%;padding:2px;}
     .role-switch button{padding:10px 8px;font-size:12.5px;}
@@ -2392,9 +2405,12 @@
     }
   }
 
-  /* CARGAR VARIOS BL DE UNA VEZ (TT 1 lleva BL A + BL B + BL C) y confirmar el cargue.
-     Todo o nada: si una cantidad no cabe, no se guarda ninguna. Cada BL queda en el
-     historial con su cantidad. */
+  /* CARGAR BL A UN TT (uno o varios a la vez) y confirmar el cargue.
+     - Se puede hacer varias veces sobre el mismo TT: las líneas se van sumando
+       (TT 1 lleva BL A; después se le agrega BL B y BL C) hasta que se reverse o libere.
+     - Todo o nada: si una cantidad no cabe, no se guarda ninguna.
+     - Al historial solo se envía lo NUEVO de esta confirmación (una fila por BL);
+       lo que el TT ya llevaba confirmado quedó registrado antes. */
   async function cargarVarios(r, ttCodigo, nuevas){
     var t0 = findTT(r, ttCodigo);
     var quienNombre = currentSession ? currentSession.nombre : null;
@@ -2402,11 +2418,11 @@
     var ok = await mutateRecord(r.id, function(cur){
       var tt = findTT(cur, ttCodigo);
       if(!tt) return {error: 'El TT# '+ttCodigo+' ya no está en esta programación.'};
-      if(tt.estado === 'cargado') return {error: 'El TT# '+ttCodigo+' ya tiene el cargue confirmado.'};
       var items = (cur.items||[]).map(function(i){
         return {bl: i.bl, cantidad: i.cantidad, restante: i.restante != null ? Number(i.restante) : Number(i.cantidad)};
       });
-      var lineas = ttLineas(tt); /* si traía un cargue a medias, se suma */
+      var previas = ttLineas(tt);
+      var lineas = previas.map(function(l){ return {bl: l.bl, cantidad: l.cantidad}; });
       for(var k = 0; k < nuevas.length; k++){
         var n = nuevas[k];
         var it = items.find(function(i){ return i.bl === n.bl; });
@@ -2416,7 +2432,8 @@
         var ya = lineas.find(function(l){ return l.bl === n.bl; });
         if(ya) ya.cantidad += n.cantidad; else lineas.push({bl: n.bl, cantidad: n.cantidad});
       }
-      lineasLog = lineas;
+      /* un cargue "a medias" de una versión anterior nunca se registró: se registra ahora */
+      lineasLog = (tt.estado === 'cargando' ? previas : []).concat(nuevas);
       return {
         fields: {
           tts: reemplazarTT(cur, ttCodigo, ttNuevo(tt, 'cargado', lineas, quienNombre, 'Cargado')),
@@ -2509,6 +2526,19 @@
   }
 
   var collapsedState = {};
+
+  /* Las tarjetas de TT/BL programados nacen contraídas (ver recordCard).
+     Tocar el título las abre/cierra; tocar en cualquier otra parte de la
+     pantalla mientras una está abierta la vuelve a contraer. */
+  document.addEventListener('click', function(e){
+    document.querySelectorAll('.rec-sec.sec-tt.collapsible, .rec-sec.sec-bl.collapsible').forEach(function(sec){
+      if(sec.classList.contains('collapsed')) return;
+      if(sec.contains(e.target)) return;
+      sec.classList.add('collapsed');
+      var key = sec.dataset.collapseKey;
+      if(key) collapsedState[key] = true;
+    });
+  });
 
   function startEditRoute(r, headEl){
     var left = headEl.querySelector('.route').parentElement;
@@ -2603,7 +2633,8 @@
     if((r.tts||[]).length){
       var ttListDiv = document.createElement('div');
       var ttKey = r.id + ':tt';
-      ttListDiv.className = 'rec-tt rec-sec sec-tt collapsible' + (collapsedState[ttKey] ? ' collapsed' : '');
+      ttListDiv.className = 'rec-tt rec-sec sec-tt collapsible' + (collapsedState[ttKey] === false ? '' : ' collapsed');
+      ttListDiv.dataset.collapseKey = ttKey;
       var ttHtml = '<div class="tt-title collapsible-title"><span>Vehículos (TT)<span class="tt-count">'+(r.tts||[]).length+'</span></span> <span class="chevron">&#9662;</span></div><div class="collapsible-content">';
       (r.tts||[]).forEach(function(tt){
         var cargado = tt.estado === 'cargado';
@@ -2642,7 +2673,8 @@
     if((r.items||[]).length){
       var itemsDiv = document.createElement('div');
       var blKey = r.id + ':bl';
-      itemsDiv.className = 'rec-tt rec-sec sec-bl collapsible' + (collapsedState[blKey] ? ' collapsed' : '');
+      itemsDiv.className = 'rec-tt rec-sec sec-bl collapsible' + (collapsedState[blKey] === false ? '' : ' collapsed');
+      itemsDiv.dataset.collapseKey = blKey;
       var rows = (r.items||[]).map(function(it){
         var restante = it.restante != null ? it.restante : it.cantidad;
         var completo = Number(restante) <= 0;
@@ -2662,13 +2694,13 @@
     }
 
     if(opts.editableStatus){
-      var ttsLibres = (r.tts||[]).filter(function(tt){ return tt.estado !== 'cargado'; }); /* libres o con cargue en curso */
+      var ttsLibres = (r.tts||[]).slice(); /* todos: un TT ya cargado puede seguir recibiendo BL */
       var itemsConRestante = (r.items||[]).filter(function(it){ return (it.restante != null ? it.restante : it.cantidad) > 0; });
       if(ttsLibres.length && itemsConRestante.length){
         var cargaDiv = document.createElement('div');
         cargaDiv.className = 'rec-tt rec-sec sec-carga carga-form';
         cargaDiv.dataset.recId = r.id;
-        var ttOptions = ttsLibres.map(function(tt){ return '<option value="'+esc(tt.codigo)+'">TT# '+esc(tt.codigo)+' - '+esc(tt.operador)+(tt.estado === 'cargando' ? ' (en cargue)' : '')+'</option>'; }).join('');
+        var ttOptions = ttsLibres.map(function(tt){ return '<option value="'+esc(tt.codigo)+'">TT# '+esc(tt.codigo)+' - '+esc(tt.operador)+(tt.estado === 'cargando' ? ' (en cargue)' : (tt.estado === 'cargado' ? ' (ya lleva: '+ttLineas(tt).map(function(l){ return l.bl+' '+l.cantidad; }).join(', ')+')' : ''))+'</option>'; }).join('');
         var blRows = itemsConRestante.map(function(it){
           var restante = it.restante != null ? it.restante : it.cantidad;
           return '<div class="carga-bl-row" data-bl="'+esc(it.bl)+'" data-max="'+esc(restante)+'">'+
@@ -2679,7 +2711,7 @@
         cargaDiv.innerHTML =
           '<div class="tt-title">Cargar</div>'+
           '<div class="carga-tt-pick"><div class="carga-pick-label">Vehículo (TT)</div><select class="sel-carga-tt">'+ttOptions+'</select></div>'+
-          '<div class="carga-bls-hint">Escribe la cantidad de cada BL que lleva este TT. Deja vacío el que no lleve.</div>'+
+          '<div class="carga-bls-hint">Escribe la cantidad de cada BL que lleva este TT. Deja vacío el que no lleve. Si el TT ya lleva algo, lo nuevo se suma.</div>'+
           '<div class="carga-bls">'+blRows+'</div>'+
           '<div class="cargue-actions"><button type="button" class="btn btn-sm btn-cargar">Confirmar cargue</button></div>';
         div.appendChild(cargaDiv);
