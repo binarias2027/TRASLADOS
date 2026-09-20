@@ -1101,8 +1101,12 @@
       </div>
     </div>
 
-    <div class="panel card-sec sec-main">
-      <h2>Correo para aviso de cargue</h2>
+    <div class="panel card-sec sec-main collapsible collapsed">
+      <div class="collapsible-title" id="correoCargueToggle" style="margin-bottom:5px;">
+        <h2 style="margin:0;">Correo para aviso de cargue</h2>
+        <span class="chevron">&#9662;</span>
+      </div>
+      <div class="collapsible-content">
       <p class="sub">Cuando Operativo confirme el cargue de un TT, se le va a ofrecer enviar un correo con el resumen a esta dirección (se abre en Gmail, listo para dar "Enviar"). Puedes cambiarla cuando quieras.</p>
       <div class="grid2">
         <div class="field">
@@ -1115,6 +1119,7 @@
         </div>
       </div>
       <p class="empty-inline" id="correoCargueEstado"></p>
+      </div>
     </div>
 
     <div class="panel card-sec sec-main">
@@ -3400,6 +3405,10 @@
     document.getElementById(id).addEventListener('keydown', function(e){
       if(e.key === 'Enter'){ e.preventDefault(); document.getElementById('btnLoginEntrar').click(); }
     });
+  });
+
+  document.getElementById('correoCargueToggle').addEventListener('click', function(){
+    document.getElementById('correoCargueToggle').parentElement.classList.toggle('collapsed');
   });
 
   /* ---------------------------------------------------------
