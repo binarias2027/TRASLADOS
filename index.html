@@ -1102,6 +1102,22 @@
     </div>
 
     <div class="panel card-sec sec-main">
+      <h2>Correo para aviso de cargue</h2>
+      <p class="sub">Cuando Operativo confirme el cargue de un TT, se le va a ofrecer enviar un correo con el resumen a esta dirección (se abre en Gmail, listo para dar "Enviar"). Puedes cambiarla cuando quieras.</p>
+      <div class="grid2">
+        <div class="field">
+          <label>Correo</label>
+          <input type="email" id="fCorreoCargue" placeholder="ejemplo@gmail.com">
+        </div>
+        <div class="field">
+          <label>&nbsp;</label>
+          <button class="btn" id="btnGuardarCorreoCargue" type="button">Guardar</button>
+        </div>
+      </div>
+      <p class="empty-inline" id="correoCargueEstado"></p>
+    </div>
+
+    <div class="panel card-sec sec-main">
       <div class="tabs-actions">
         <button class="btn ghost" id="btnRefreshAdminTraslados" type="button">Actualizar</button>
       </div>
@@ -2344,6 +2360,124 @@
 
   /* CONFIRMAR CARGUE: el TT queda cargado con todos sus BL y recién ahí
      se registra en el historial (una fila por BL). */
+  /* ---------------------------------------------------------
+     Correo para aviso de cargue (lo configura/edita el rol "admin")
+     ---------------------------------------------------------
+     Se guarda en Supabase (tabla "configuracion", mismo formato
+     id/data/updated_at que "programaciones" y "usuarios") para que
+     quede igual para todos los dispositivos. Si esa tabla todavía
+     no existe o no hay Supabase, se guarda solo en este dispositivo
+     (localStorage) y la app sigue funcionando igual.
+
+     Para crear la tabla en Supabase (una sola vez), en el SQL Editor:
+
+     create table if not exists configuracion (
+       id text primary key,
+       data jsonb,
+       updated_at timestamptz default now()
+     );
+     alter table configuracion enable row level security;
+     create policy "lectura configuracion" on configuracion for select using (true);
+     create policy "escritura configuracion" on configuracion for insert with check (true);
+     create policy "actualizacion configuracion" on configuracion for update using (true);
+  --------------------------------------------------------- */
+  var CONFIG_TABLE = 'configuracion';
+  var CONFIG_CORREO_ID = 'correo_cargue';
+  var configEmailCache = '';
+
+  function loadConfigEmailLocal(){
+    try{ return localStorage.getItem('spb_correo_cargue') || ''; }catch(e){ return ''; }
+  }
+  function saveConfigEmailLocal(v){
+    try{ localStorage.setItem('spb_correo_cargue', v); }catch(e){}
+  }
+  function pintarCorreoCargueUI(){
+    var inp = document.getElementById('fCorreoCargue');
+    if(inp && document.activeElement !== inp) inp.value = configEmailCache;
+  }
+  function esCorreoValido(v){
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(v);
+  }
+
+  async function initConfigEmail(){
+    configEmailCache = loadConfigEmailLocal();
+    pintarCorreoCargueUI();
+    if(!db) return;
+    try{
+      db.collection(CONFIG_TABLE).onSnapshot(function(snap){
+        var doc = (snap.docs || []).find(function(d){ return d.id === CONFIG_CORREO_ID; });
+        if(!doc) return;
+        var data = doc.data();
+        if(data && typeof data.email === 'string'){
+          configEmailCache = data.email;
+          saveConfigEmailLocal(configEmailCache);
+          pintarCorreoCargueUI();
+        }
+      }, function(err){
+        console.warn('No se pudo sincronizar el correo de cargue (revisa la tabla "configuracion" en Supabase):', err);
+      });
+    }catch(e){ console.warn('Error suscribiendo el correo de cargue:', e); }
+  }
+
+  async function guardarCorreoCargue(){
+    var inp = document.getElementById('fCorreoCargue');
+    var estado = document.getElementById('correoCargueEstado');
+    var val = inp.value.trim();
+    if(val && !esCorreoValido(val)){
+      showToast('Escribe un correo válido.');
+      return;
+    }
+    configEmailCache = val;
+    saveConfigEmailLocal(val);
+    if(!db){
+      if(estado) estado.textContent = 'Guardado en este dispositivo.';
+      showToast('Correo guardado en este dispositivo.');
+      return;
+    }
+    try{
+      await db.collection(CONFIG_TABLE).doc(CONFIG_CORREO_ID).set({email: val});
+      if(estado) estado.textContent = 'Guardado: se usará en todos los dispositivos.';
+      showToast('Correo guardado.');
+    }catch(e){
+      console.error('No se pudo guardar el correo en Supabase:', e);
+      if(estado) estado.textContent = 'Guardado solo en este dispositivo. Para que quede igual en todos, crea la tabla "configuracion" en Supabase (ver comentario en el código).';
+      showToast('Correo guardado en este dispositivo. No se pudo sincronizar.');
+    }
+  }
+
+  /* Correo de aviso al confirmar un cargue: se abre listo en Gmail,
+     solo falta darle "Enviar" desde ahí. */
+  function abrirGmailCompose(to, subject, body){
+    var url = 'https://mail.google.com/mail/?view=cm&fs=1&to='+encodeURIComponent(to)+
+      '&su='+encodeURIComponent(subject)+'&body='+encodeURIComponent(body);
+    window.open(url, '_blank');
+  }
+
+  function buildCargueEmailText(r, tt, lineas){
+    var lines = [];
+    lines.push('Buen día,');
+    lines.push('');
+    lines.push('Se confirmó el cargue del TT# '+tt.codigo+' ('+tt.operador+', CC '+tt.cc+') '+
+      'para el traslado de '+r.origen+' a '+r.destino+(r.fecha ? ' - Fecha: '+fmtFecha(r.fecha) : '')+'.');
+    lines.push('');
+    lines.push('Bl        Cant.');
+    lineas.forEach(function(l){ lines.push(l.bl+'        '+l.cantidad); });
+    lines.push('');
+    lines.push('Cargado por: '+(currentSession ? currentSession.nombre : '-'));
+    lines.push('');
+    lines.push('Quedamos atentos.');
+    return lines.join('\n');
+  }
+
+  async function ofrecerEnviarCorreoCargue(r, tt, lineas){
+    var correo = (configEmailCache || '').trim();
+    if(!correo || !lineas.length) return;
+    var ok = await customConfirm('Cargue confirmado. ¿Enviar un correo con el resumen a '+correo+'?');
+    if(!ok) return;
+    var asunto = 'Cargue TT# '+tt.codigo+' - '+r.origen+' a '+r.destino;
+    abrirGmailCompose(correo, asunto, buildCargueEmailText(r, tt, lineas));
+  }
+
   async function confirmarCargue(r, ttCodigo){
     var t0 = findTT(r, ttCodigo);
     var quienNombre = currentSession ? currentSession.nombre : null;
@@ -2374,6 +2508,7 @@
           cantidad: l.cantidad
         });
       });
+      ofrecerEnviarCorreoCargue(r, t0 || {codigo: ttCodigo, operador: '-', cc: '-'}, lineasLog);
     }
   }
 
@@ -2947,6 +3082,7 @@
 
   document.getElementById('btnRefreshOp').addEventListener('click', function(){ onRecords(lastRecords, true); showToast('Actualizado.'); });
   document.getElementById('btnRefreshAdminTraslados').addEventListener('click', function(){ onRecords(lastRecords, true); showToast('Actualizado.'); });
+  document.getElementById('btnGuardarCorreoCargue').addEventListener('click', guardarCorreoCargue);
 
   /* ---------------------------------------------------------
      Historial de despachos: consulta por fecha (solo Admin)
@@ -3444,6 +3580,7 @@
   initDb().then(function(){
     subscribeRecords(onRecords);
     subscribeUsuarios(handleUsuariosSnapshot);
+    initConfigEmail();
   });
 
 })();
