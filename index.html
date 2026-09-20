@@ -1,0 +1,3266 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+<title>SPB · Programación de Traslado</title>
+
+<!-- PWA: manifest, ícono y color de marca -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#003d7a">
+<meta name="background-color" content="#ffffff">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="SPB Traslados">
+<meta name="description" content="Sistema de programación de traslados (TT y BL) de Sociedad Portuaria Buenaventura.">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="icon" href="favicon.ico">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<!-- Cliente de Supabase (JS). Este archivo está pensado para alojarse
+     FUERA de Claude (tu propio hosting, Netlify, Vercel, GitHub Pages,
+     o simplemente abriéndolo en tu navegador). Dentro de Claude esta
+     conexión no funcionará por las restricciones de seguridad de la
+     plataforma. -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+  :root{
+    --spb-blue-dark:#003d7a;
+    --spb-blue:#005aab;
+    --spb-cyan:#00b8f1;
+    --spb-cyan-pale:#f2f2f2;
+    --spb-yellow:#ffca08;
+    --ink:#1a2733;
+    --ink-soft:#5b6b78;
+    --line:#dde3e9;
+    --line-strong:#c3cdd6;
+    --bg:#ffffff;
+    --card:#ffffff;
+    --danger:#c0392b;
+    --ok-bg:#ffffff;
+    --ok-fg:#1a2733;
+    --warn-bg:#ffffff;
+    --warn-fg:#1a2733;
+    --radius:12px;
+    --shadow:0 1px 2px rgba(16,40,64,.06), 0 8px 24px rgba(16,40,64,.07);
+  }
+  /* Fondo siempre blanco: no se sigue el modo oscuro del dispositivo/navegador */
+  html, body{background:#ffffff !important;}
+
+  *{box-sizing:border-box;}
+  :root{
+    padding-top:env(safe-area-inset-top, 0px);
+    padding-bottom:env(safe-area-inset-bottom, 0px);
+  }
+  html{scroll-padding-top:env(safe-area-inset-top, 0px);}
+  html,body{margin:0;padding:0;height:100%;}
+  body{
+    background:var(--bg);
+    color:var(--ink);
+    font-family:'Inter',-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    -webkit-font-smoothing:antialiased;
+    -moz-osx-font-smoothing:grayscale;
+    min-height:100vh;
+    min-height:100dvh;
+    letter-spacing:.1px;
+    text-transform:uppercase;
+  }
+  input,select,textarea,button{text-transform:uppercase;}
+  input::placeholder,textarea::placeholder{text-transform:uppercase;}
+  a{color:var(--spb-blue);}
+
+  header.topbar{
+    background:#ffffff;
+    border-bottom:1px solid var(--line);
+    box-shadow:0 1px 0 rgba(16,40,64,.03), 0 4px 16px rgba(16,40,64,.04);
+    padding:calc(10px + env(safe-area-inset-top, 0px)) 20px 10px;
+    display:grid;
+    grid-template-columns:1fr auto 1fr;
+    align-items:center;
+    gap:14px;
+    position:sticky;
+    top:0;
+    z-index:20;
+  }
+  header.topbar .left{display:flex;align-items:center;}
+  header.topbar img{height:40px;display:block;}
+  header.topbar .title{
+    color:var(--spb-blue-dark);
+    line-height:1.2;
+    text-align:center;
+    grid-column:2;
+  }
+  header.topbar .title .t1{font-weight:700;font-size:15px;letter-spacing:.2px;color:var(--spb-blue-dark);}
+  header.topbar .title .t2{font-size:11px;color:var(--spb-blue);margin-top:1px;}
+  header.topbar .right{
+    display:flex;
+    align-items:center;
+    justify-content:flex-end;
+    gap:8px;
+    flex-wrap:nowrap;
+  }
+  @media (max-width:600px){
+    header.topbar{
+      grid-template-columns:auto 1fr;
+      padding:calc(8px + env(safe-area-inset-top, 0px)) 12px 8px;
+    }
+    header.topbar img{height:32px;}
+    header.topbar .title{display:none;}
+    header.topbar .right{grid-column:2;justify-content:flex-end;}
+    header.topbar #btnInstalarApp{display:none !important;}
+    header.topbar .status-pill .label-text{display:none;}
+  }
+
+  /* Sesión: chip compacto + menú desplegable (en vez de botones grandes) */
+  .session-info{position:relative;}
+  .session-chip{
+    display:flex;
+    align-items:center;
+    gap:6px;
+    background:#fff;
+    border:1.5px solid var(--spb-blue);
+    border-radius:999px;
+    padding:6px 10px 6px 12px;
+    cursor:pointer;
+    font-family:inherit;
+  }
+  .session-chip .chip-caret{font-size:10px;color:var(--spb-blue);transition:transform .15s ease;}
+  .session-info.open .session-chip .chip-caret{transform:rotate(180deg);}
+  .session-menu{
+    position:absolute;
+    top:calc(100% + 8px);
+    right:0;
+    background:#fff;
+    border:1px solid var(--line);
+    border-radius:10px;
+    box-shadow:0 8px 24px rgba(16,40,64,.18);
+    min-width:200px;
+    padding:6px;
+    display:none;
+    flex-direction:column;
+    gap:2px;
+    z-index:30;
+  }
+  .session-info.open .session-menu{display:flex;}
+  .session-menu-item{
+    text-align:left;
+    background:none;
+    border:none;
+    padding:10px 12px;
+    border-radius:7px;
+    font-size:13px;
+    font-weight:600;
+    font-family:inherit;
+    color:var(--ink);
+    cursor:pointer;
+  }
+  .session-menu-item:hover{background:var(--spb-cyan-pale);}
+  .session-menu-item.danger{color:var(--danger);}
+
+  .role-switch{
+    display:flex;
+    background:#fff;
+    border:1.5px solid var(--spb-blue);
+    border-radius:999px;
+    padding:3px;
+    gap:2px;
+  }
+  .role-switch button{
+    flex:1 1 0;
+    text-align:center;
+    border:none;
+    background:transparent;
+    color:var(--spb-blue-dark);
+    font-size:13.5px;
+    font-weight:600;
+    padding:11px 16px;
+    border-radius:999px;
+    cursor:pointer;
+    transition:background .15s ease, color .15s ease;
+    white-space:nowrap;
+  }
+  .role-switch button:not(.active):hover{background:var(--spb-cyan-pale);}
+  .role-switch button.active{
+    background:var(--spb-blue);
+    color:#fff;
+  }
+
+  .status-pill{
+    font-size:11px;
+    font-weight:600;
+    padding:4px 10px;
+    border-radius:999px;
+    background:#fff;
+    color:var(--spb-blue-dark);
+    border:1.5px solid var(--spb-blue);
+    display:flex;
+    align-items:center;
+    gap:6px;
+  }
+  .status-pill .dot{width:7px;height:7px;border-radius:50%;background:var(--spb-blue);}
+  .status-pill.offline .dot{background:#b3b3b3;}
+
+  main{
+    max-width:1180px;
+    margin:0 auto;
+    padding:28px 20px 90px;
+  }
+
+  .panel{
+    background:var(--card);
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    box-shadow:var(--shadow);
+    padding:24px 26px;
+    margin-bottom:20px;
+  }
+  .panel h2{
+    margin:0 0 5px;
+    font-size:17px;
+    font-weight:700;
+    letter-spacing:-.1px;
+    color:var(--spb-blue-dark);
+  }
+  .panel .sub{
+    margin:0 0 18px;
+    font-size:13px;
+    line-height:1.5;
+    color:var(--ink-soft);
+  }
+
+  /* Tarjetas profesionales por categoría (mismo lenguaje visual en todo el HTML) */
+  .card-sec{
+    --acc:#003d7a; --acc-line:#c4d3e3;
+    border-left:5px solid var(--acc);
+    box-shadow:0 1px 4px rgba(0,58,110,.10);
+  }
+  .card-sec.sec-main{--acc:#003d7a; --acc-line:#c4d3e3;}
+  .card-sec.sec-tt{--acc:#005aab; --acc-line:#b9d3ec;}
+  .card-sec.sec-bl{--acc:#00a3d9; --acc-line:#b8e6f7;}
+  .card-sec.sec-user{--acc:#0f8b8d; --acc-line:#b5dfe0;}
+  .card-sec.sec-fin{--acc:#c0392b; --acc-line:#f0c4bf;}
+  .card-sec > h2,
+  .card-sec > h3.card-title{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    margin:0 0 14px;
+    padding-bottom:10px;
+    border-bottom:1px solid var(--acc-line);
+    font-size:14px;
+    font-weight:700;
+    letter-spacing:.5px;
+    text-transform:uppercase;
+    color:var(--spb-blue-dark);
+  }
+  .card-sec > h3.card-title{margin-top:0;}
+  .card-sec .tt-count{
+    display:inline-block;
+    min-width:20px;
+    text-align:center;
+    padding:1px 7px;
+    border-radius:999px;
+    background:var(--acc);
+    color:#fff;
+    font-size:11px;
+    letter-spacing:0;
+  }
+  .card-sec .btn-row{margin-top:0;}
+  .collapsible-content > .card-sec{margin-top:16px;margin-bottom:0;}
+
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  @media (max-width:640px){.grid2{grid-template-columns:1fr;}}
+  .grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;}
+  @media (max-width:720px){.grid3{grid-template-columns:1fr 1fr;}}
+  @media (max-width:480px){.grid3{grid-template-columns:1fr;}}
+  .tt-row{display:grid;grid-template-columns:110px 2fr 1fr 34px;gap:12px;align-items:end;}
+  @media (max-width:640px){.tt-row{grid-template-columns:1fr;}}
+  .tt-row-entry{grid-template-columns:110px 2fr 1fr auto auto;}
+  @media (max-width:640px){.tt-row-entry{grid-template-columns:1fr;}}
+  .item-row{display:grid;grid-template-columns:2fr 1fr;gap:12px;align-items:end;}
+  .item-row-entry{grid-template-columns:2fr 140px auto auto;}
+  @media (max-width:640px){.item-row-entry{grid-template-columns:1fr;}}
+  .item-row-entry .btn{white-space:nowrap;padding:9px 20px;}
+  .usuario-form-row{grid-template-columns:1fr 1fr 1fr 1fr auto auto;}
+  @media (max-width:900px){.usuario-form-row{grid-template-columns:1fr 1fr;}}
+  @media (max-width:480px){.usuario-form-row{grid-template-columns:1fr;}}
+  .tt-row-entry .btn{white-space:nowrap;padding:9px 20px;}
+
+  .tt-info-row{
+    padding-bottom:14px;
+    margin-bottom:14px;
+    border-bottom:1px dashed var(--line);
+  }
+  .tt-info-row:last-child{
+    border-bottom:none;
+    margin-bottom:0;
+    padding-bottom:0;
+  }
+  .tt-row .icon-btn{align-self:end;margin-bottom:1px;}
+  .tt-row span:empty{display:block;}
+
+  .subhead{
+    margin:20px 0 10px;
+    padding-top:16px;
+    border-top:1px solid var(--line);
+    font-size:14px;
+    color:var(--spb-blue-dark);
+  }
+  .empty-inline{
+    font-size:13px;
+    color:var(--ink-soft);
+    padding:8px 0;
+  }
+  .tt-programado-item{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    border:1px solid var(--line);
+    border-radius:9px;
+    padding:12px 14px;
+    margin-bottom:9px;
+    background:#ffffff;
+    box-shadow:0 1px 2px rgba(16,40,64,.04);
+    transition:border-color .15s ease;
+  }
+  .tt-programado-item:hover{border-color:var(--spb-blue);}
+  .tt-programado-item .info{font-size:13.5px;}
+  .tt-programado-item .info b{color:var(--spb-blue-dark);}
+
+  label{
+    display:block;
+    font-size:11.5px;
+    font-weight:600;
+    color:var(--ink-soft);
+    margin-bottom:6px;
+    letter-spacing:.15px;
+    text-transform:none;
+  }
+  input[type=text],input[type=date],input[type=number],input[type=password],select,textarea{
+    width:100%;
+    padding:10px 12px;
+    border:1px solid var(--line-strong);
+    border-radius:8px;
+    background:var(--bg);
+    color:var(--ink);
+    font-size:14px;
+    font-family:inherit;
+    transition:border-color .15s ease, box-shadow .15s ease;
+  }
+  input[type=text]::placeholder,input[type=number]::placeholder,input[type=password]::placeholder{color:#9aa7b2;}
+  input:focus,select:focus,textarea:focus{
+    outline:none;
+    border-color:var(--spb-blue);
+    box-shadow:0 0 0 3px rgba(0,90,171,.12);
+  }
+  button:focus-visible{
+    outline:2px solid var(--spb-cyan);
+    outline-offset:1px;
+  }
+  .field{margin-bottom:14px;}
+
+  button{font-family:inherit;cursor:pointer;}
+  .btn{
+    border:1px solid var(--spb-blue);
+    background:var(--spb-blue);
+    color:#fff;
+    font-weight:600;
+    font-size:13.5px;
+    padding:10px 18px;
+    border-radius:8px;
+    box-shadow:0 1px 2px rgba(0,58,110,.15);
+    transition:filter .15s ease, transform .05s ease, box-shadow .15s ease;
+  }
+  .btn:hover{filter:brightness(1.08);box-shadow:0 2px 6px rgba(0,58,110,.22);}
+  .btn:active{transform:translateY(1px);}
+  .btn.secondary{
+    background:transparent;
+    color:var(--spb-blue);
+    box-shadow:none;
+  }
+  .btn.ghost{
+    background:transparent;
+    color:var(--ink-soft);
+    border-color:var(--line-strong);
+    box-shadow:none;
+  }
+  .btn.danger{
+    background:transparent;
+    color:var(--danger);
+    border-color:var(--danger);
+    box-shadow:none;
+  }
+  .btn.yellow{
+    background:var(--spb-yellow);
+    border-color:var(--spb-yellow);
+    color:#3a2b00;
+  }
+  .btn[disabled]{opacity:.5;cursor:not-allowed;}
+  .btn-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px;}
+
+  .tt-items-card{
+    border:1.5px solid var(--spb-blue);
+    border-radius:10px;
+    padding:14px 14px 6px;
+    margin-bottom:14px;
+    background:#ffffff;
+  }
+  .tt-items-card:last-child{margin-bottom:0;}
+  .tt-items-head{
+    margin-bottom:10px;
+  }
+  .tt-items-title{
+    background:var(--spb-blue-dark);
+    color:#fff;
+    font-size:12px;
+    font-weight:700;
+    padding:4px 10px;
+    border-radius:6px;
+    display:inline-block;
+  }
+
+  table.items{
+    width:100%;
+    border-collapse:collapse;
+    margin-bottom:10px;
+  }
+  table.items th{
+    text-align:left;
+    font-size:11px;
+    font-weight:700;
+    letter-spacing:.3px;
+    text-transform:uppercase;
+    color:var(--ink-soft);
+    padding:8px 8px;
+    border-bottom:1.5px solid var(--line-strong);
+  }
+  table.items td{
+    padding:6px 8px;
+    border-bottom:1px solid var(--line);
+  }
+  table.items tr:last-child td{border-bottom:none;}
+  table.items td input{padding:8px 10px;font-size:13.5px;}
+  table.items td.qty{width:110px;}
+  table.items td.rm{width:34px;}
+  .icon-btn{
+    background:transparent;
+    border:1px solid var(--line-strong);
+    color:var(--danger);
+    width:30px;height:30px;
+    border-radius:7px;
+    font-size:15px;
+    line-height:1;
+    display:flex;align-items:center;justify-content:center;
+    transition:background .15s ease, border-color .15s ease;
+  }
+  .icon-btn:hover{background:#f7f9fb;border-color:var(--spb-blue);}
+  .link-btn{
+    background:none;
+    border:none;
+    color:var(--spb-blue);
+    font-weight:600;
+    font-size:12.5px;
+    padding:6px 2px;
+  }
+
+  .preview{
+    background:#fbfcfd;
+    color:#1a2733;
+    border:1px solid var(--line-strong);
+    font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;
+    font-size:12.8px;
+    white-space:pre-wrap;
+    padding:18px;
+    border-radius:9px;
+    line-height:1.6;
+    max-height:340px;
+    overflow:auto;
+  }
+
+  .rec-card{
+    border:1px solid var(--line);
+    border-radius:11px;
+    padding:16px 18px;
+    margin-bottom:14px;
+    background:var(--card);
+    box-shadow:0 1px 2px rgba(16,40,64,.04);
+  }
+  .rec-head{
+    display:flex;
+    align-items:flex-start;
+    gap:10px;
+    justify-content:space-between;
+    margin-bottom:8px;
+  }
+  .rec-head .route{font-weight:700;font-size:14px;color:var(--spb-blue-dark);}
+  .rec-head .meta{font-size:12px;color:var(--ink-soft);margin-top:2px;}
+  .badge{
+    font-size:11px;
+    font-weight:700;
+    padding:4px 10px;
+    border-radius:999px;
+    white-space:nowrap;
+  }
+  .badge{border:1.5px solid var(--line-strong);}
+  .badge.pendiente{background:#fff9e8;color:#8a6100;border-color:#f0d998;}
+  .badge.programado{background:var(--spb-blue);color:#fff;border-color:var(--spb-blue);}
+  .badge.atendido{background:#eef7f0;color:#1f7a45;border-color:#bfe3cb;text-decoration:none;}
+
+  .rec-tt{
+    border-top:1px dashed var(--line);
+    padding-top:8px;
+    margin-top:8px;
+    font-size:13px;
+  }
+  .rec-tt .tt-title{font-weight:700;color:var(--spb-blue-dark);margin-bottom:2px;}
+  .rec-tt table{width:100%;border-collapse:collapse;margin-top:4px;}
+  .rec-tt table td{padding:2px 6px;font-size:12.8px;}
+  .rec-tt table td.n{color:var(--ink-soft);}
+
+  /* Tarjeta de sección: misma estructura para TT, BL, Cargar y Cargas */
+  .rec-tt.rec-sec{
+    --acc:#005aab; --acc-bg:#f3f8fd; --acc-line:#b9d3ec;
+    border:1.5px solid var(--acc-line);
+    border-left:5px solid var(--acc);
+    border-radius:10px;
+    background:var(--acc-bg);
+    padding:10px 14px 8px;
+    margin:16px 0;
+    box-shadow:0 1px 4px rgba(0,58,110,.10);
+  }
+  .rec-sec.sec-tt{--acc:#005aab; --acc-bg:#f3f8fd; --acc-line:#b9d3ec;}
+  .rec-sec.sec-bl{--acc:#00a3d9; --acc-bg:#f1fafe; --acc-line:#b8e6f7;}
+  .rec-sec.sec-carga{--acc:#e0a800; --acc-bg:#fffaf0; --acc-line:#f0dfa8;}
+  .rec-sec.sec-cargas{--acc:#1f7a45; --acc-bg:#f3faf5; --acc-line:#bfe3cb;}
+  .rec-sec .tt-title{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    font-size:12.5px;
+    letter-spacing:.4px;
+    text-transform:uppercase;
+    padding-bottom:8px;
+    margin-bottom:8px;
+    border-bottom:1px solid var(--acc-line);
+  }
+  .rec-sec .tt-count{
+    display:inline-block;
+    min-width:20px;
+    text-align:center;
+    margin-left:8px;
+    padding:1px 7px;
+    border-radius:999px;
+    background:var(--acc);
+    color:#fff;
+    font-size:11px;
+    letter-spacing:0;
+  }
+  .rec-sec .tt-op-row,
+  .rec-sec .tt-programado-item,
+  .rec-sec .bl-row,
+  .rec-sec .carga-row{
+    background:#fff;
+    border:1px solid var(--line);
+    border-radius:8px;
+    padding:8px 12px;
+    margin-bottom:7px;
+    box-shadow:none;
+  }
+  .rec-sec .carga-row{padding:10px 12px;}
+  .rec-sec .tt-programado-item:hover{border-color:var(--line);}
+  .bl-row{
+    display:grid;
+    grid-template-columns:1.4fr 1fr 1fr;
+    gap:8px;
+    align-items:center;
+    font-size:12.8px;
+  }
+  .bl-row .bl-name{font-weight:700;color:var(--spb-blue-dark);}
+  .bl-row .n{color:var(--ink-soft);}
+  .rec-sec .bl-row.bl-completo{background:#eef7f0;border-color:#bfe3cb;}
+  @media (max-width:480px){.bl-row{grid-template-columns:1fr 1fr;}}
+
+  .tt-op-row{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    flex-wrap:wrap;
+    padding:6px 0;
+  }
+  .tt-op-info{font-size:13px;}
+  .tt-op-meta{font-size:11px;color:var(--ink-soft);margin-top:2px;}
+  .tt-op-meta b{color:var(--spb-blue-dark);}
+  .badge.libre-badge{background:#eef7f0;color:#1f7a45;border:1.5px solid #bfe3cb;padding:2px 8px;font-size:10.5px;}
+  .badge.cargado{background:#fff9e8;color:#8a6100;border:1.5px solid #f0d998;padding:2px 8px;font-size:10.5px;}
+  .tt-op-actions{display:flex;gap:6px;}
+  .carga-actions{display:flex;gap:6px;flex-shrink:0;}
+  @media (max-width:480px){.tt-programado-item{flex-wrap:wrap;} .carga-actions{width:100%;} .carga-actions .btn{flex:1;}}
+  .btn.btn-sm{padding:6px 12px;font-size:12.5px;}
+
+  .carga-form{background:var(--spb-cyan-pale);border-radius:8px;padding:12px;margin-top:10px;}
+  .carga-row{display:grid;grid-template-columns:1.4fr 1.4fr 90px auto;gap:8px;align-items:center;}
+  @media (max-width:640px){.carga-row{grid-template-columns:1fr;}}
+  .carga-row select,.carga-row input{
+    padding:8px 10px;
+    border:1px solid var(--line-strong);
+    border-radius:7px;
+    font-size:13px;
+    font-family:inherit;
+    background:#fff;
+    color:var(--ink);
+  }
+
+  .collapsible-title{
+    cursor:pointer;
+    user-select:none;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+  }
+  .collapsible-title .chevron{
+    font-size:11px;
+    color:var(--ink-soft);
+    transition:transform .15s ease;
+  }
+  .collapsible.collapsed .collapsible-title .chevron{transform:rotate(-90deg);}
+  .collapsible.collapsed .collapsible-content{display:none;}
+
+  tr.bl-completo td{background:#eef7f0;}
+  .bl-completo-label{
+    color:#1f7a45;
+    font-weight:700;
+    font-size:11.5px;
+    letter-spacing:.2px;
+  }
+
+  .empty{
+    text-align:center;
+    padding:40px 20px;
+    color:var(--ink-soft);
+  }
+  .empty .big{font-size:34px;margin-bottom:6px;}
+
+  select.status-select{
+    font-size:12px;
+    font-weight:600;
+    padding:6px 8px;
+    width:auto;
+  }
+
+  .tabs-actions{display:flex;justify-content:flex-end;gap:8px;margin-bottom:10px;}
+
+  .toast{
+    position:fixed;
+    left:50%;
+    bottom:24px;
+    transform:translateX(-50%) translateY(20px);
+    background:var(--spb-blue-dark);
+    color:#fff;
+    padding:11px 18px;
+    border-radius:8px;
+    font-size:13.5px;
+    box-shadow:0 8px 24px rgba(0,0,0,.25);
+    opacity:0;
+    transition:opacity .2s ease, transform .2s ease;
+    pointer-events:none;
+    z-index:50;
+    max-width:90vw;
+  }
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);}
+
+  .confirm-overlay{
+    position:fixed;
+    inset:0;
+    background:rgba(16,40,64,.45);
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    z-index:100;
+    padding:20px;
+  }
+  .confirm-box{
+    background:#fff;
+    border-radius:12px;
+    padding:22px 24px;
+    max-width:420px;
+    width:100%;
+    box-shadow:0 20px 60px rgba(0,0,0,.3);
+  }
+  .confirm-box p{
+    margin:0;
+    font-size:14.5px;
+    line-height:1.5;
+    color:var(--ink);
+    white-space:pre-line;
+  }
+
+  .session-info{
+    display:flex;
+    align-items:center;
+    gap:10px;
+  }
+  .session-label{
+    font-size:13px;
+    font-weight:600;
+    color:var(--spb-blue-dark);
+  }
+  .session-label .rol-tag{
+    display:inline-block;
+    margin-left:6px;
+    font-size:10.5px;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:.3px;
+    padding:2px 8px;
+    border-radius:999px;
+    background:var(--spb-blue);
+    color:#fff;
+  }
+
+  .login-overlay{
+    position:fixed;
+    inset:0;
+    background:#f4f9fc;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    z-index:200;
+    padding:20px;
+  }
+  .login-box{
+    background:#fff;
+    border:1px solid var(--line);
+    border-radius:14px;
+    padding:32px 30px;
+    max-width:380px;
+    width:100%;
+    box-shadow:var(--shadow);
+    text-align:center;
+  }
+  .login-box img{height:48px;margin-bottom:14px;}
+  .login-box h2{margin:0 0 6px;color:var(--spb-blue-dark);font-size:19px;}
+  .login-box .sub{margin:0 0 20px;font-size:13.5px;color:var(--ink-soft);}
+  .login-box .field{text-align:left;}
+  .login-box .btn{width:100%;margin-top:6px;}
+  .login-error{
+    color:var(--danger);
+    font-size:13px;
+    margin-top:12px;
+    display:none;
+  }
+
+  .spinner{
+    width:28px;height:28px;
+    border:3px solid var(--line);
+    border-top-color:var(--spb-blue);
+    border-radius:50%;
+    margin:0 auto;
+    animation:spin .8s linear infinite;
+  }
+  @keyframes spin{to{transform:rotate(360deg);}}
+
+  main{visibility:hidden;}
+  main.ready{visibility:visible;}
+
+  .usuario-item{
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+    border:1px solid var(--line);
+    border-radius:9px;
+    padding:12px 14px;
+    margin-bottom:9px;
+    background:#ffffff;
+    box-shadow:0 1px 2px rgba(16,40,64,.04);
+  }
+  .usuario-item .info{font-size:13.5px;}
+  .usuario-item .info b{color:var(--spb-blue-dark);}
+  .rol-badge{
+    display:inline-block;
+    font-size:10.5px;
+    font-weight:700;
+    text-transform:uppercase;
+    letter-spacing:.3px;
+    padding:2px 8px;
+    border-radius:999px;
+    margin-left:6px;
+  }
+  .rol-badge.admin{background:#fde7e7;color:#a13030;}
+  .rol-badge.administrador{background:#e6f0fb;color:var(--spb-blue-dark);}
+  .rol-badge.operativo{background:#fff9e8;color:#8a6100;}
+  .rol-badge.ver{background:#eef7f0;color:#1f7a45;}
+
+  ::-webkit-scrollbar{width:9px;height:9px;}
+  ::-webkit-scrollbar-thumb{background:var(--line);border-radius:6px;}
+
+  /* =========================================================
+     Ajustes para que se sienta como una app nativa en celular
+  ========================================================= */
+  @media (max-width:600px){
+    main{padding:14px 10px 90px;}
+    .panel{padding:16px 14px;border-radius:12px;margin-bottom:14px;}
+    .panel h2{font-size:15.5px;}
+    .panel .sub{font-size:12.5px;margin-bottom:14px;}
+    .card-sec{border-left-width:4px;}
+    .card-sec > h2, .card-sec > h3.card-title{font-size:12.5px;margin-bottom:12px;padding-bottom:8px;}
+
+    /* Pestañas (Programar traslado / Programaciones, Administrador / Operativo / Ver) */
+    .role-switch{width:100%;padding:2px;}
+    .role-switch button{padding:10px 8px;font-size:12.5px;}
+
+    /* Botón Actualizar y acciones de encabezado de tarjeta */
+    .tabs-actions{margin-bottom:8px;}
+    .tabs-actions .btn{padding:7px 12px;font-size:12px;}
+
+    /* Filas de TT/BL programados: menos aire, texto más contenido */
+    .tt-programado-item, .usuario-item{padding:10px 12px;}
+    .tt-op-row{padding:5px 0;}
+    .rec-tt{padding:10px 12px 6px;}
+    .rec-tt .tt-title{font-size:11.5px;}
+
+    /* Formularios: campos con menos relleno lateral */
+    input[type=text],input[type=date],input[type=number],input[type=password],select,textarea{
+      padding:9px 10px;
+      font-size:13.5px;
+    }
+    label{font-size:11px;}
+    .field{margin-bottom:10px;}
+
+    /* Botones de acción no deben forzar scroll horizontal */
+    .btn{padding:9px 14px;font-size:13px;}
+    .btn-row{gap:8px;}
+
+    /* Tarjeta de "Cargar": que los campos no se corten */
+    .carga-row{gap:6px;}
+    .carga-row select,.carga-row input{font-size:12.5px;padding:8px 8px;}
+
+    h3.subhead{font-size:12.5px;}
+  }
+
+  @media (max-width:360px){
+    header.topbar img{height:28px;}
+    .session-chip{padding:5px 8px 5px 10px;}
+    .session-label{font-size:12px;}
+  }
+</style>
+</head>
+<body>
+
+<header class="topbar">
+  <div class="left">
+  <img src="data:image/png;base64,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" alt="Sociedad Portuaria Buenaventura" />
+  </div>
+  <div class="title">
+    <div class="t1">Programación de Traslado</div>
+    <div class="t2">Sociedad Portuaria Buenaventura</div>
+  </div>
+  <div class="right">
+    <button class="btn secondary btn-sm" id="btnInstalarApp" type="button" style="display:none;">&#8681; Instalar</button>
+    <div class="status-pill offline" id="syncPill"><span class="dot"></span><span id="syncLabel" class="label-text">Local</span></div>
+    <div class="session-info" id="sessionInfo" style="display:none;">
+      <button class="session-chip" id="sessionChipBtn" type="button">
+        <span id="sessionLabel" class="session-label"></span>
+        <span class="chip-caret">&#9662;</span>
+      </button>
+      <div class="session-menu" id="sessionMenu">
+        <button class="session-menu-item" id="btnCambiarPassword" type="button">Cambiar contraseña</button>
+        <button class="session-menu-item danger" id="btnLogout" type="button">Cerrar sesión</button>
+      </div>
+    </div>
+  </div>
+</header>
+
+<main>
+
+  <!-- ================= VISTA ADMINISTRADOR ================= -->
+  <section id="viewAdmin">
+
+    <div class="role-switch" style="margin-bottom:16px;">
+      <button id="tabCapturarBtn" class="active" type="button">Programar traslado</button>
+      <button id="tabProgramacionesBtn" type="button">Programaciones</button>
+    </div>
+
+    <div id="tabCapturarContent">
+
+    <div class="panel card-sec sec-main">
+      <h2>Nueva programación</h2>
+
+      <div class="grid3">
+        <div class="field">
+          <label>Origen</label>
+          <input type="text" id="fOrigen" placeholder="ej. TECNOBELL" value="TECNOBELL - BSE" />
+        </div>
+        <div class="field">
+          <label>Destino</label>
+          <input type="text" id="fDestino" placeholder="ej. bodega1" value="BODEGA 3" />
+        </div>
+        <div class="field">
+          <label>Fecha de programación</label>
+          <input type="date" id="fFecha" />
+        </div>
+      </div>
+    </div>
+
+    <div class="panel card-sec sec-tt">
+      <h2>Vehículos (TT)</h2>
+      <p class="sub">Datos del TT y del operador que ingresa o sale por zona franca.</p>
+      <div id="ttEntryRow" class="tt-row tt-row-entry">
+        <div class="field">
+          <label>TT #</label>
+          <input type="text" id="fTTCodigo" inputmode="numeric" maxlength="3" placeholder="ej. 66" />
+        </div>
+        <div class="field">
+          <label>Nombre</label>
+          <input type="text" id="fTTOperador" placeholder="Nombre del operador" />
+        </div>
+        <div class="field">
+          <label>Cédula (CC)</label>
+          <input type="text" id="fTTCc" inputmode="numeric" placeholder="ej. 31385819" />
+        </div>
+        <div class="field">
+          <label>&nbsp;</label>
+          <button class="btn" id="btnProgramarTT" type="button">Programar</button>
+        </div>
+        <div class="field" id="fieldCancelarTT" style="display:none;">
+          <label>&nbsp;</label>
+          <button class="btn ghost" id="btnCancelarTT" type="button">Cancelar</button>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="panel card-sec sec-tt">
+      <h2>TT programados <span class="tt-count" id="ttProgramadosCount">0</span></h2>
+      <div id="ttProgramadosList" class="empty-inline">Aún no has programado ningún TT.</div>
+    </div>
+
+    <div class="panel card-sec sec-bl">
+      <h2>BL y cantidad</h2>
+      <p class="sub">Lista única de BL con su cantidad. Cualquiera de los TT registrados arriba puede recoger cualquiera de estos BL.</p>
+      <div id="itemEntryRow" class="item-row item-row-entry">
+        <div class="field">
+          <label>Bl</label>
+          <input type="text" id="fItemBl" placeholder="ej. 11097028" />
+        </div>
+        <div class="field">
+          <label>Cant.</label>
+          <input type="text" id="fItemCant" inputmode="numeric" placeholder="ej. 4" />
+        </div>
+        <div class="field">
+          <label>&nbsp;</label>
+          <button class="btn" id="btnProgramarItem" type="button">Programar</button>
+        </div>
+        <div class="field" id="fieldCancelarItem" style="display:none;">
+          <label>&nbsp;</label>
+          <button class="btn ghost" id="btnCancelarItem" type="button">Cancelar</button>
+        </div>
+      </div>
+
+    </div>
+
+    <div class="panel card-sec sec-bl">
+      <h2>BL programados <span class="tt-count" id="itemsProgramadosCount">0</span></h2>
+      <div id="itemsProgramadosList" class="empty-inline">Aún no has programado ningún BL.</div>
+    </div>
+
+    <div class="panel card-sec sec-fin">
+      <h2>Finalizar traslado</h2>
+      <p class="sub">Cierra la programación actual y libera sus TT y BL.</p>
+      <div class="btn-row">
+        <button class="btn danger" id="btnFinalizarTraslado" type="button">Finalizar traslado</button>
+      </div>
+    </div>
+
+    </div>
+
+    <div id="tabProgramacionesContent" style="display:none;">
+      <div class="panel card-sec sec-main">
+        <div class="tabs-actions">
+          <button class="btn ghost" id="btnRefreshAdministradorProg" type="button">Actualizar</button>
+        </div>
+        <h2>Programaciones para hoy</h2>
+        <p class="sub">Lo mismo que ve Operativo, solo para consulta (sin poder cargar TT/BL desde aquí).</p>
+        <div id="listAdministradorProg"></div>
+      </div>
+    </div>
+
+  </section>
+
+  <!-- ================= VISTA OPERATIVO ================= -->
+  <section id="viewOp" style="display:none;">
+    <div class="panel card-sec sec-main">
+      <div class="tabs-actions">
+        <button class="btn ghost" id="btnRefreshOp" type="button">Actualizar</button>
+      </div>
+      <h2>Programaciones para hoy</h2>
+      <p class="sub">Estas son las solicitudes enviadas por Administración para programar el ingreso o salida de los TT.</p>
+      <div id="listOp"></div>
+    </div>
+  </section>
+
+  <!-- ================= VISTA VER (SOLO LECTURA) ================= -->
+  <section id="viewVer" style="display:none;">
+    <div class="panel card-sec sec-main">
+      <div class="tabs-actions">
+        <button class="btn ghost" id="btnRefreshVer" type="button">Actualizar</button>
+      </div>
+      <h2>Seguimiento (solo lectura)</h2>
+      <p class="sub">Aquí puedes ver en tiempo real lo que va haciendo Operativo. No se puede editar nada desde esta vista.</p>
+      <div id="listVer"></div>
+    </div>
+  </section>
+
+  <!-- ================= VISTA ADMIN (GESTIÓN DE USUARIOS) ================= -->
+  <section id="viewGestion" style="display:none;">
+    <div class="panel card-sec sec-user collapsible collapsed">
+      <div class="collapsible-title" id="gestionUsuariosToggle" style="margin-bottom:5px;">
+        <h2 style="margin:0;">Gestión de usuarios</h2>
+        <span class="chevron">&#9662;</span>
+      </div>
+      <div class="collapsible-content" id="gestionUsuariosContent">
+      <p class="sub">Crea las cuentas de tu equipo y asígnales su rol: Administrador, Operativo o Ver (solo lectura).</p>
+
+      <div class="panel card-sec sec-user">
+      <h3 class="card-title">Nueva cuenta</h3>
+      <p class="sub">Toda cuenta nueva se crea con la contraseña por defecto <b>123456789</b>. Cada persona debe cambiarla ella misma desde "Cambiar contraseña" al iniciar sesión.</p>
+
+      <div class="grid2">
+        <div class="field">
+          <label>Nombre</label>
+          <input type="text" id="uNombre" placeholder="Nombre de la persona">
+        </div>
+        <div class="field">
+          <label>Usuario</label>
+          <input type="text" id="uUsuario" placeholder="ej. mhincapie">
+        </div>
+      </div>
+
+      <div class="grid2">
+        <div class="field">
+          <label>Rol</label>
+          <select id="uRol">
+            <option value="administrador">Administrador</option>
+            <option value="operativo">Operativo</option>
+            <option value="ver">Ver (solo lectura)</option>
+            <option value="admin">Admin (gestiona usuarios)</option>
+          </select>
+        </div>
+      </div>
+
+      <div class="btn-row">
+        <button class="btn" id="btnCrearUsuario" type="button">Crear</button>
+        <span id="fieldCancelarUsuario" style="display:none;">
+          <button class="btn ghost" id="btnCancelarUsuario" type="button">Cancelar</button>
+        </span>
+      </div>
+
+      </div>
+
+      <div class="panel card-sec sec-user">
+      <h3 class="card-title">Usuarios <span class="tt-count" id="usuariosCount">0</span></h3>
+      <div id="usuariosList" class="empty-inline">Aún no hay usuarios.</div>
+      </div>
+      </div>
+    </div>
+
+    <div class="panel card-sec sec-main">
+      <div class="tabs-actions">
+        <button class="btn ghost" id="btnRefreshAdminTraslados" type="button">Actualizar</button>
+      </div>
+      <h2>Traslados</h2>
+      <p class="sub">Consulta cómo va cada traslado (TT, BL, cargas), edítalo o elimínalo si es necesario.</p>
+      <div id="listAdminTraslados"></div>
+    </div>
+
+    <div class="panel card-sec sec-user">
+      <h2>Historial de movimientos</h2>
+      <p class="sub">Cada Cargar, Reversar, Liberar o Quitar TT queda registrado con el nombre de quién lo hizo. Se guarda 30 días y luego se borra solo. Elige una fecha para consultar.</p>
+      <div class="grid2">
+        <div class="field">
+          <label>Fecha</label>
+          <input type="date" id="fDespachoFecha">
+        </div>
+        <div class="field">
+          <label>&nbsp;</label>
+          <button class="btn" id="btnBuscarDespachos" type="button">Buscar</button>
+        </div>
+      </div>
+      <div id="listDespachos" class="empty-inline">Elige una fecha y dale "Buscar".</div>
+    </div>
+  </section>
+
+</main>
+
+<div class="toast" id="toast"></div>
+
+<div class="confirm-overlay" id="confirmOverlay" style="display:none;">
+  <div class="confirm-box">
+    <p id="confirmMessage"></p>
+    <div class="btn-row" style="justify-content:flex-end;margin-top:16px;">
+      <button class="btn ghost" id="confirmCancelBtn" type="button">Cancelar</button>
+      <button class="btn danger" id="confirmOkBtn" type="button" style="background:var(--danger);color:#fff;">Confirmar</button>
+    </div>
+  </div>
+</div>
+
+<div class="login-overlay" id="appLoading" style="z-index:300;">
+  <div style="text-align:center;">
+    <img src="icon-192.png" alt="" style="width:64px;height:64px;border-radius:16px;box-shadow:0 4px 16px rgba(0,58,110,.18);margin-bottom:16px;" onerror="this.style.display='none'">
+    <div class="spinner"></div>
+  </div>
+</div>
+
+<div class="login-overlay" id="loginOverlay" style="display:none;">
+  <div class="login-box">
+    <img src="data:image/png;base64,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" alt="SPB" />
+
+    <div id="loginBootstrap" style="display:none;">
+      <h2>Crear cuenta de Administrador</h2>
+      <p class="sub">Aún no hay usuarios creados. Crea la primera cuenta (rol Admin) para poder gestionar el resto. Tu contraseña inicial será <b>123456789</b>; podrás cambiarla apenas entres.</p>
+      <div class="field">
+        <label>Nombre</label>
+        <input type="text" id="bsNombre" placeholder="Tu nombre">
+      </div>
+      <div class="field">
+        <label>Usuario</label>
+        <input type="text" id="bsUsuario" placeholder="ej. admin">
+      </div>
+      <button class="btn" id="btnBootstrapCrear" type="button">Crear cuenta y entrar</button>
+      <p class="login-error" id="bootstrapError"></p>
+    </div>
+
+    <div id="loginNormal" style="display:none;">
+      <h2>Iniciar sesión</h2>
+      <p class="sub">Ingresa tu usuario y contraseña para entrar a tu vista.</p>
+      <div class="field">
+        <label>Usuario</label>
+        <input type="text" id="loginUsuario" placeholder="Tu usuario">
+      </div>
+      <div class="field">
+        <label>Contraseña</label>
+        <input type="password" id="loginPassword" placeholder="Tu contraseña" autocomplete="current-password" autocapitalize="off" autocorrect="off" spellcheck="false">
+      </div>
+      <button class="btn" id="btnLoginEntrar" type="button">Entrar</button>
+      <p class="login-error" id="loginError"></p>
+    </div>
+  </div>
+</div>
+
+<div class="confirm-overlay" id="changePasswordOverlay" style="display:none;">
+  <div class="confirm-box" style="text-align:left;">
+    <h2 style="margin:0 0 4px;color:var(--spb-blue-dark);font-size:18px;">Cambiar mi contraseña</h2>
+    <p class="sub" style="margin:0 0 16px;">Confirma tu contraseña actual y escribe la nueva dos veces.</p>
+    <div class="field">
+      <label>Contraseña actual</label>
+      <input type="password" id="cpActual" placeholder="Tu contraseña actual" autocomplete="current-password" autocapitalize="off" autocorrect="off" spellcheck="false">
+    </div>
+    <div class="field">
+      <label>Nueva contraseña</label>
+      <input type="password" id="cpNueva" placeholder="Nueva contraseña" autocomplete="new-password" autocapitalize="off" autocorrect="off" spellcheck="false">
+      <small style="color:var(--ink-soft);font-size:11.5px;">Mínimo 8 caracteres, con letras y números.</small>
+    </div>
+    <div class="field">
+      <label>Confirmar nueva contraseña</label>
+      <input type="password" id="cpConfirmar" placeholder="Repite la nueva contraseña" autocomplete="new-password" autocapitalize="off" autocorrect="off" spellcheck="false">
+    </div>
+    <p class="login-error" id="cpError"></p>
+    <div class="btn-row" style="justify-content:flex-end;margin-top:6px;">
+      <button class="btn ghost" id="cpCancelBtn" type="button">Cancelar</button>
+      <button class="btn" id="cpGuardarBtn" type="button">Guardar contraseña</button>
+    </div>
+  </div>
+</div>
+
+<script>
+(function(){
+
+  /* =========================================================
+     CONFIGURACIÓN DE SUPABASE
+     -------------------------------------------------------
+     1) Crea un proyecto gratis en https://supabase.com
+     2) Ve a Project Settings > API y copia:
+          - "Project URL"          -> pégala en SUPABASE_URL
+          - "anon public" API key  -> pégala en SUPABASE_ANON_KEY
+     3) Ve a "SQL Editor" en Supabase y ejecuta el script SQL que
+        viene en el archivo supabase_setup.sql (te lo entregué aparte).
+        Eso crea las tablas "programaciones" y "usuarios" y activa
+        la sincronización en tiempo real (Realtime).
+     4) Guarda este archivo y ábrelo en tu navegador, o súbelo a tu
+        hosting (Netlify, Vercel, GitHub Pages, tu propio servidor).
+
+     Mientras dejes los valores de ejemplo de abajo, la app funciona
+     igual que antes (guardando solo en este navegador) para que
+     puedas probar la interfaz sin tener Supabase listo todavía.
+  ========================================================= */
+  var SUPABASE_URL = 'https://glzhwoswyditummgfbin.supabase.co';
+  var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdsemh3b3N3eWRpdHVtbWdmYmluIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk3NDQyMzIsImV4cCI6MjEwNTMyMDIzMn0.ZY5bVbeahJ2mGXjWwN4IcofoyEvztHMIg1jR3tZ4Hug';
+
+  var supabaseClient = null;
+  var supabaseConfigured = SUPABASE_URL.indexOf('TU-PROYECTO') === -1 && SUPABASE_ANON_KEY.indexOf('TU_LLAVE') === -1;
+  if(supabaseConfigured && window.supabase && typeof window.supabase.createClient === 'function'){
+    try{
+      supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+    }catch(e){
+      console.error('No se pudo iniciar el cliente de Supabase:', e);
+      supabaseConfigured = false;
+    }
+  }else{
+    supabaseConfigured = false;
+  }
+
+
+  /* ---------------------------------------------------------
+     Utilidades
+  --------------------------------------------------------- */
+  function uid(prefix){
+    return prefix + '_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2,7);
+  }
+  function esc(s){
+    return (s||'').toString().replace(/[&<>"']/g, function(c){
+      return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c];
+    });
+  }
+  function pad(n){ return n<10 ? '0'+n : ''+n; }
+  function todayISO(){
+    var d = new Date();
+    return d.getFullYear() + '-' + pad(d.getMonth()+1) + '-' + pad(d.getDate());
+  }
+  function fmtFecha(iso){
+    if(!iso) return '';
+    var parts = iso.split('-');
+    if(parts.length!==3) return iso;
+    return parts[2] + '/' + parts[1] + '/' + parts[0];
+  }
+  function showToast(msg){
+    var t = document.getElementById('toast');
+    t.textContent = msg;
+    t.classList.add('show');
+    clearTimeout(t._h);
+    t._h = setTimeout(function(){ t.classList.remove('show'); }, 2600);
+  }
+
+  /* Reemplazo de window.confirm(): algunos navegadores bloquean los
+     diálogos nativos dentro de esta ventana, así que usamos un
+     cuadro de confirmación propio. Devuelve una Promise<boolean>. */
+  function customConfirm(message){
+    return new Promise(function(resolve){
+      var overlay = document.getElementById('confirmOverlay');
+      document.getElementById('confirmMessage').textContent = message;
+      overlay.style.display = 'flex';
+
+      function cleanup(result){
+        overlay.style.display = 'none';
+        okBtn.removeEventListener('click', onOk);
+        cancelBtn.removeEventListener('click', onCancel);
+        overlay.removeEventListener('click', onOverlayClick);
+        resolve(result);
+      }
+      var okBtn = document.getElementById('confirmOkBtn');
+      var cancelBtn = document.getElementById('confirmCancelBtn');
+      function onOk(){ cleanup(true); }
+      function onCancel(){ cleanup(false); }
+      function onOverlayClick(e){ if(e.target === overlay) cleanup(false); }
+      okBtn.addEventListener('click', onOk);
+      cancelBtn.addEventListener('click', onCancel);
+      overlay.addEventListener('click', onOverlayClick);
+    });
+  }
+
+  /* Como customConfirm, pero con varias opciones para elegir
+     (por ejemplo: "Reversar", "Liberar" o "Cancelar").
+     Devuelve la "key" de la opción elegida, o null si se cancela. */
+  function customChoice(message, choices){
+    return new Promise(function(resolve){
+      var overlay = document.getElementById('confirmOverlay');
+      var box = overlay.querySelector('.confirm-box');
+      document.getElementById('confirmMessage').textContent = message;
+
+      var rowOriginal = box.querySelector('.btn-row');
+      var row = document.createElement('div');
+      row.className = 'btn-row';
+      row.style.justifyContent = 'flex-end';
+      row.style.marginTop = '16px';
+      row.style.flexWrap = 'wrap';
+
+      var handlers = [];
+      function cleanup(result){
+        overlay.style.display = 'none';
+        overlay.removeEventListener('click', onOverlayClick);
+        row.replaceWith(rowOriginal);
+        resolve(result);
+      }
+      function onOverlayClick(e){ if(e.target === overlay) cleanup(null); }
+
+      choices.forEach(function(choice){
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'btn' + (choice.ghost ? ' ghost' : (choice.danger ? ' danger' : ''));
+        if(choice.danger){ btn.style.background = 'var(--danger)'; btn.style.color = '#fff'; }
+        btn.textContent = choice.label;
+        var handler = function(){ cleanup(choice.key); };
+        btn.addEventListener('click', handler);
+        handlers.push({btn: btn, handler: handler});
+        row.appendChild(btn);
+      });
+
+      rowOriginal.replaceWith(row);
+      overlay.addEventListener('click', onOverlayClick);
+      overlay.style.display = 'flex';
+    });
+  }
+
+  /* ---------------------------------------------------------
+     Capa de datos: intenta usar la capacidad "db" de Claude
+     (sincroniza entre Administrador y Operativo en cualquier
+     dispositivo). Si no está disponible, usa localStorage
+     como respaldo local para poder probar el formulario.
+  --------------------------------------------------------- */
+  var db = null;
+  var dbReady = false;
+  var LOCAL_KEY = 'spb_programaciones_local_v1';
+  var unsubscribe = null;
+
+  function localGetAll(){
+    try{
+      var raw = localStorage.getItem(LOCAL_KEY);
+      return raw ? JSON.parse(raw) : [];
+    }catch(e){ return []; }
+  }
+  function localSaveAll(list){
+    try{ localStorage.setItem(LOCAL_KEY, JSON.stringify(list)); }catch(e){}
+  }
+
+  var listeners = [];
+  function notifyListeners(list){
+    listeners.forEach(function(fn){ fn(list); });
+  }
+
+  function localSubscribe(fn){
+    listeners.push(fn);
+    fn(localGetAll());
+    return function(){
+      listeners = listeners.filter(function(l){ return l!==fn; });
+    };
+  }
+
+  /* =========================================================
+     Adaptador de Supabase: imita exactamente la misma forma
+     (doc().set/update/delete, collection().add/onSnapshot, etc.)
+     que usa el resto de la app, para no tener que tocar nada más.
+     Cada tabla en Supabase tiene columnas: id (text), data (jsonb),
+     updated_at (timestamptz). Todo el contenido va dentro de "data".
+  ========================================================= */
+  function newLocalId(){
+    return 'id_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
+  }
+
+  function createSupabaseDbShim(client){
+    function makeDocRef(table, id){
+      return {
+        id: id,
+        get: async function(){
+          var res = await client.from(table).select('id,data').eq('id', id).maybeSingle();
+          if(res.error) throw res.error;
+          if(!res.data) return {id: id, exists: false, data: function(){ return undefined; }};
+          return {id: id, exists: true, data: function(){ return res.data.data; }};
+        },
+        set: async function(data){
+          var payload = Object.assign({}, data, {id: id});
+          var res = await client.from(table).upsert({id: id, data: payload, updated_at: new Date().toISOString()});
+          if(res.error) throw res.error;
+        },
+        update: async function(fields){
+          var cur = await client.from(table).select('data').eq('id', id).maybeSingle();
+          if(cur.error) throw cur.error;
+          var merged = Object.assign({}, cur.data ? cur.data.data : {}, fields, {id: id});
+          var res = await client.from(table).update({data: merged, updated_at: new Date().toISOString()}).eq('id', id).select('id');
+          if(res.error) throw res.error;
+          /* Con RLS activo y sin política de UPDATE, Supabase responde "ok" pero no cambia nada.
+             Se trata como error para no mostrar "se actualizó" cuando no se guardó. */
+          if(!res.data || !res.data.length){
+            throw new Error('No se actualizó ninguna fila en "'+table+'" (revisa las políticas RLS de UPDATE).');
+          }
+        },
+        delete: async function(){
+          var res = await client.from(table).delete().eq('id', id);
+          if(res.error) throw res.error;
+        }
+      };
+    }
+
+    function makeCollectionRef(table){
+      var limitN = null;
+      var ref = {
+        doc: function(id){ return makeDocRef(table, id || newLocalId()); },
+        add: async function(data){
+          var id = newLocalId();
+          var payload = Object.assign({}, data, {id: id});
+          var res = await client.from(table).insert({id: id, data: payload, updated_at: new Date().toISOString()});
+          if(res.error) throw res.error;
+          return {id: id};
+        },
+        orderBy: function(){ return ref; }, /* se ordena por fecha de actualización, ver nota abajo */
+        limit: function(n){ limitN = n; return ref; },
+        onSnapshot: function(next, onError){
+          var closed = false;
+          var seq = 0, lastApplied = 0;
+          function fetchAndEmit(){
+            var mySeq = ++seq;
+            var q = client.from(table).select('id,data').order('updated_at', {ascending: false});
+            if(limitN) q = q.limit(limitN);
+            q.then(function(res){
+              /* ignora respuestas viejas que lleguen después de una más nueva */
+              if(closed || mySeq < lastApplied) return;
+              lastApplied = mySeq;
+              if(res.error){
+                if(onError) onError({code: 'unavailable', message: res.error.message});
+                return;
+              }
+              var docs = (res.data || []).map(function(row){
+                return {id: row.id, exists: true, data: function(){ return row.data; }};
+              });
+              next({docs: docs, size: docs.length, empty: docs.length === 0});
+            }, function(){ /* sin red: se reintenta con el próximo evento o el sondeo */ });
+          }
+          fetchAndEmit();
+          var channel = client.channel(table + '-changes-' + Math.random().toString(36).slice(2))
+            .on('postgres_changes', {event: '*', schema: 'public', table: table}, fetchAndEmit)
+            .subscribe(function(status){
+              if(closed) return;
+              if(status === 'SUBSCRIBED'){
+                fetchAndEmit(); /* cubre lo que pasó mientras se conectaba */
+                setSyncStatus(true);
+              }else if(status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED'){
+                setSyncStatus(false);
+              }
+            });
+
+          /* Red de seguridad: si el celular estuvo en segundo plano o se cayó el
+             websocket, al volver se re-consulta todo y además hay un sondeo suave. */
+          function onVisible(){ if(!document.hidden) fetchAndEmit(); }
+          function onOnline(){ fetchAndEmit(); }
+          document.addEventListener('visibilitychange', onVisible);
+          window.addEventListener('online', onOnline);
+          var pollTimer = setInterval(function(){ if(!document.hidden) fetchAndEmit(); }, 30000);
+
+          return function(){
+            closed = true;
+            clearInterval(pollTimer);
+            document.removeEventListener('visibilitychange', onVisible);
+            window.removeEventListener('online', onOnline);
+            try{ client.removeChannel(channel); }catch(e){}
+          };
+        }
+      };
+      return ref;
+    }
+
+    return {
+      doc: function(path){
+        var parts = path.split('/');
+        return makeDocRef(parts[0], parts[1]);
+      },
+      collection: function(path){
+        return makeCollectionRef(path);
+      }
+    };
+  }
+
+  async function initDb(){
+    try{
+      if(supabaseConfigured && supabaseClient){
+        db = createSupabaseDbShim(supabaseClient);
+      }else if(window.claude && typeof window.claude.use === 'function'){
+        db = await window.claude.use('db');
+      }
+    }catch(e){ console.error('Error iniciando la base de datos:', e); db = null; }
+    dbReady = true;
+    var pill = document.getElementById('syncPill');
+    var label = document.getElementById('syncLabel');
+    if(db){
+      pill.classList.remove('offline');
+      label.textContent = 'Sincronizado';
+    }else{
+      pill.classList.add('offline');
+      label.textContent = 'Solo en este dispositivo';
+    }
+  }
+
+  function setSyncStatus(online){
+    var pill = document.getElementById('syncPill');
+    var label = document.getElementById('syncLabel');
+    if(!pill || !label) return;
+    pill.classList.toggle('offline', !online);
+    label.textContent = online ? 'Sincronizado' : 'Reconectando…';
+  }
+
+  function subscribeRecords(fn){
+    if(db){
+      var q = db.collection('programaciones').orderBy('createdAt','desc').limit(200);
+      return q.onSnapshot(function(snap){
+        var docs = (snap && snap.docs) ? snap.docs : [];
+        var records = docs.map(function(docSnap){
+          var data = (docSnap.exists && docSnap.data()) ? docSnap.data() : {};
+          if(!data.id) data.id = docSnap.id;
+          return data;
+        });
+        fn(records);
+      }, function(err){
+        console.error('Error de sincronización (db.onSnapshot):', err);
+      });
+    }else{
+      return localSubscribe(fn);
+    }
+  }
+
+  async function saveRecord(record){
+    if(db){
+      await db.collection('programaciones').doc(record.id).set(record);
+    }else{
+      var list = localGetAll();
+      var idx = list.findIndex(function(r){ return r.id === record.id; });
+      if(idx !== -1) list[idx] = record; else list.unshift(record);
+      localSaveAll(list);
+      notifyListeners(list);
+    }
+  }
+
+  async function updateRecordFields(id, fields){
+    if(db){
+      await db.collection('programaciones').doc(id).update(fields);
+    }else{
+      var list = localGetAll();
+      list = list.map(function(r){
+        if(r.id===id){ for(var k in fields){ r[k] = fields[k]; } }
+        return r;
+      });
+      localSaveAll(list);
+      notifyListeners(list);
+    }
+  }
+
+  /* Estado automático según los movimientos de la mercancía:
+     - pendiente: no ha habido ningún movimiento
+     - programado: hay movimientos (algún TT cargado o cantidad ya tomada de un BL)
+     - atendido: toda la carga ya se despachó (todos los BL en cero y ningún TT cargado) */
+  function calcEstado(r){
+    var items = r.items || [], tts = r.tts || [];
+    var hayCargado = tts.some(function(t){ return t.estado === 'cargado'; });
+    var hayMovimiento = hayCargado || items.some(function(it){
+      var rest = it.restante != null ? Number(it.restante) : Number(it.cantidad);
+      return rest < Number(it.cantidad);
+    });
+    if(!hayMovimiento) return 'pendiente';
+    var todoDespachado = items.length > 0 && !hayCargado && items.every(function(it){
+      var rest = it.restante != null ? Number(it.restante) : Number(it.cantidad);
+      return rest <= 0;
+    });
+    return todoDespachado ? 'atendido' : 'programado';
+  }
+
+  /* Una programación vence a las 23:59 del día de su fecha (hora local) */
+  function isExpired(r){
+    var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(r.fecha || '');
+    var y, mo, d;
+    if(m){ y = +m[1]; mo = +m[2]; d = +m[3]; }
+    else{
+      var c = new Date(r.createdAt || Date.now());
+      y = c.getFullYear(); mo = c.getMonth() + 1; d = c.getDate();
+    }
+    return Date.now() >= new Date(y, mo - 1, d, 23, 59, 0, 0).getTime();
+  }
+
+  /* Lee la programación tal como está AHORA en la base (no la copia que quedó
+     pintada en pantalla), para no pisar cambios que hizo otro rol un segundo antes. */
+  async function getRecordFresh(id){
+    if(db){
+      var snap = await db.collection('programaciones').doc(id).get();
+      if(snap && snap.exists){
+        var d = snap.data();
+        if(d && !d.id) d.id = id;
+        return d || null;
+      }
+      return null;
+    }
+    return localGetAll().find(function(r){ return r.id === id; }) || null;
+  }
+
+  /* fn(actual) devuelve {error:'...'} o {fields:{...}, message:'...'} */
+  async function mutateRecord(id, fn){
+    var cur = null, leyo = true;
+    try{ cur = await getRecordFresh(id); }
+    catch(e){
+      leyo = false;
+      cur = (lastRecords || []).find(function(r){ return r.id === id; }) || null;
+    }
+    if(!cur){
+      showToast(leyo ? 'Esa programación ya no existe (la eliminaron o finalizaron).' : 'No se pudo leer la programación.');
+      return false;
+    }
+    var out = fn(cur);
+    if(!out || out.error){
+      showToast((out && out.error) || 'No se pudo completar la acción.');
+      return false;
+    }
+    out.fields.estado = calcEstado(Object.assign({}, cur, out.fields));
+    try{
+      await updateRecordFields(id, out.fields);
+    }catch(e){
+      showToast('No se pudo guardar el cambio. Intenta de nuevo.');
+      return false;
+    }
+    if(out.message) showToast(out.message);
+    return true;
+  }
+
+  async function deleteRecord(id){
+    if(db){
+      await db.collection('programaciones').doc(id).delete();
+    }else{
+      var list = localGetAll().filter(function(r){ return r.id!==id; });
+      localSaveAll(list);
+      notifyListeners(list);
+    }
+  }
+
+  /* ---------------------------------------------------------
+     Usuarios y roles (Admin, Administrador, Operativo, Ver)
+  --------------------------------------------------------- */
+  var LOCAL_USERS_KEY = 'spb_usuarios_local_v1';
+
+  function localUsersGetAll(){
+    try{
+      var raw = localStorage.getItem(LOCAL_USERS_KEY);
+      return raw ? JSON.parse(raw) : [];
+    }catch(e){ return []; }
+  }
+  function localUsersSaveAll(list){
+    try{ localStorage.setItem(LOCAL_USERS_KEY, JSON.stringify(list)); }catch(e){}
+  }
+
+  var userListeners = [];
+  function notifyUserListeners(list){
+    userListeners.forEach(function(fn){ fn(list); });
+  }
+
+  function subscribeUsuarios(fn){
+    if(db){
+      return db.collection('usuarios').onSnapshot(function(snap){
+        var docs = (snap && snap.docs) ? snap.docs : [];
+        var list = docs.map(function(docSnap){
+          var data = (docSnap.exists && docSnap.data()) ? docSnap.data() : {};
+          if(!data.id) data.id = docSnap.id;
+          return data;
+        });
+        fn(list);
+      }, function(err){
+        console.error('Error de sincronización (usuarios):', err);
+      });
+    }else{
+      userListeners.push(fn);
+      fn(localUsersGetAll());
+      return function(){
+        userListeners = userListeners.filter(function(l){ return l!==fn; });
+      };
+    }
+  }
+
+  async function createUsuario(usuario){
+    if(db){
+      var ref = await db.collection('usuarios').add(usuario);
+      return ref.id;
+    }else{
+      var list = localUsersGetAll();
+      usuario.id = uid('user');
+      list.push(usuario);
+      localUsersSaveAll(list);
+      notifyUserListeners(list);
+      return usuario.id;
+    }
+  }
+
+  async function updateUsuario(id, fields){
+    if(db){
+      await db.collection('usuarios').doc(id).update(fields);
+    }else{
+      var list = localUsersGetAll().map(function(u){
+        if(u.id===id){ for(var k in fields){ u[k] = fields[k]; } }
+        return u;
+      });
+      localUsersSaveAll(list);
+      notifyUserListeners(list);
+    }
+  }
+
+  async function deleteUsuario(id){
+    if(db){
+      await db.collection('usuarios').doc(id).delete();
+    }else{
+      var list = localUsersGetAll().filter(function(u){ return u.id!==id; });
+      localUsersSaveAll(list);
+      notifyUserListeners(list);
+    }
+  }
+
+  /* ---------------------------------------------------------
+     Formulario: Vehículos (TT) y BL/Cantidad son independientes.
+     Varios TT comparten una sola lista de BL: cualquier TT puede
+     recoger cualquiera de los BL/cantidades registrados.
+  --------------------------------------------------------- */
+  var ttProgramados = [];
+  var ttEditIndex = null;
+  var ttProgramadosListEl = document.getElementById('ttProgramadosList');
+  var fTTCodigo = document.getElementById('fTTCodigo');
+  var fTTOperador = document.getElementById('fTTOperador');
+  var fTTCc = document.getElementById('fTTCc');
+  var btnProgramarTT = document.getElementById('btnProgramarTT');
+  var fieldCancelarTT = document.getElementById('fieldCancelarTT');
+
+  /* Solo dígitos, y el TT # limitado a 3 caracteres */
+  fTTCodigo.addEventListener('input', function(){
+    fTTCodigo.value = fTTCodigo.value.replace(/\D/g, '').slice(0, 3);
+  });
+  fTTCc.addEventListener('input', function(){
+    fTTCc.value = fTTCc.value.replace(/\D/g, '');
+  });
+  fTTOperador.addEventListener('input', function(){
+    fTTOperador.value = fTTOperador.value.replace(/[^A-Za-zÁÉÍÓÚÑÜáéíóúñü ]/g, '');
+  });
+
+  /* ---- BL y cantidad: misma estructura que Vehículos (TT) ---- */
+  var itemsProgramados = [];
+  var itemEditIndex = null;
+  var itemsProgramadosListEl = document.getElementById('itemsProgramadosList');
+  var fItemBl = document.getElementById('fItemBl');
+  var fItemCant = document.getElementById('fItemCant');
+  var btnProgramarItem = document.getElementById('btnProgramarItem');
+  var fieldCancelarItem = document.getElementById('fieldCancelarItem');
+
+  fItemCant.addEventListener('input', function(){
+    fItemCant.value = fItemCant.value.replace(/\D/g, '');
+  });
+
+  function renderItemsProgramados(){
+    scheduleAutoSync();
+    document.getElementById('itemsProgramadosCount').textContent = itemsProgramados.length;
+    itemsProgramadosListEl.innerHTML = '';
+    if(!itemsProgramados.length){
+      var empty = document.createElement('div');
+      empty.className = 'empty-inline';
+      empty.textContent = 'Aún no has programado ningún BL.';
+      itemsProgramadosListEl.appendChild(empty);
+      return;
+    }
+    itemsProgramados.forEach(function(it, idx){
+      var el = document.createElement('div');
+      el.className = 'tt-programado-item';
+      if(idx === itemEditIndex) el.style.borderColor = 'var(--spb-blue)';
+      el.innerHTML =
+        '<div class="info"><b>Bl '+esc(it.bl)+'</b> - Cant. '+esc(it.cantidad)+'</div>'+
+        '<div style="display:flex;gap:6px;">'+
+          '<button type="button" class="icon-btn btn-edit-item" title="Editar" style="color:var(--spb-blue);">&#9998;</button>'+
+          '<button type="button" class="icon-btn btn-rm-item" title="Quitar">&times;</button>'+
+        '</div>';
+      el.querySelector('.btn-edit-item').addEventListener('click', function(){
+        startEditItem(idx);
+      });
+      el.querySelector('.btn-rm-item').addEventListener('click', function(){
+        itemsProgramados.splice(idx, 1);
+        if(itemEditIndex === idx) cancelEditItem();
+        renderItemsProgramados();
+      });
+      itemsProgramadosListEl.appendChild(el);
+    });
+  }
+
+  function clearItemEntry(){
+    fItemBl.value = '';
+    fItemCant.value = '';
+    fItemBl.focus();
+  }
+
+  function startEditItem(idx){
+    var it = itemsProgramados[idx];
+    itemEditIndex = idx;
+    fItemBl.value = it.bl;
+    fItemCant.value = it.cantidad;
+    btnProgramarItem.textContent = 'Guardar cambios';
+    fieldCancelarItem.style.display = '';
+    fItemBl.focus();
+    renderItemsProgramados();
+  }
+
+  function cancelEditItem(){
+    itemEditIndex = null;
+    btnProgramarItem.textContent = 'Programar';
+    fieldCancelarItem.style.display = 'none';
+    clearItemEntry();
+    renderItemsProgramados();
+  }
+  document.getElementById('btnCancelarItem').addEventListener('click', cancelEditItem);
+
+  btnProgramarItem.addEventListener('click', function(){
+    var bl = fItemBl.value.trim().toUpperCase();
+    var cantidad = fItemCant.value.trim();
+    if(!bl || !cantidad){
+      showToast('Diligencia el Bl y la Cantidad para poder programar.');
+      return;
+    }
+    var dupIdx = itemsProgramados.findIndex(function(it){ return it.bl === bl; });
+    if(dupIdx !== -1 && dupIdx !== itemEditIndex){
+      showToast('El Bl '+bl+' ya está programado.');
+      return;
+    }
+    if(itemEditIndex !== null){
+      itemsProgramados[itemEditIndex] = {bl: bl, cantidad: cantidad};
+      showToast('Bl actualizado.');
+      cancelEditItem();
+    }else{
+      itemsProgramados.push({bl: bl, cantidad: cantidad});
+      showToast('Bl agregado a BL programados.');
+      clearItemEntry();
+      renderItemsProgramados();
+    }
+  });
+
+  function renderTTProgramados(){
+    scheduleAutoSync();
+    document.getElementById('ttProgramadosCount').textContent = ttProgramados.length;
+    ttProgramadosListEl.innerHTML = '';
+    if(!ttProgramados.length){
+      var empty = document.createElement('div');
+      empty.className = 'empty-inline';
+      empty.textContent = 'Aún no has programado ningún TT.';
+      ttProgramadosListEl.appendChild(empty);
+      return;
+    }
+    ttProgramados.forEach(function(tt, idx){
+      var item = document.createElement('div');
+      item.className = 'tt-programado-item';
+      if(idx === ttEditIndex) item.style.borderColor = 'var(--spb-blue)';
+      item.innerHTML =
+        '<div class="info"><b>TT# '+esc(tt.codigo)+'</b> - '+esc(tt.operador)+' - CC '+esc(tt.cc)+'</div>'+
+        '<div style="display:flex;gap:6px;">'+
+          '<button type="button" class="icon-btn btn-edit-tt" title="Editar" style="color:var(--spb-blue);">&#9998;</button>'+
+          '<button type="button" class="icon-btn btn-rm-tt" title="Quitar">&times;</button>'+
+        '</div>';
+      item.querySelector('.btn-edit-tt').addEventListener('click', function(){
+        startEditTT(idx);
+      });
+      item.querySelector('.btn-rm-tt').addEventListener('click', function(){
+        ttProgramados.splice(idx, 1);
+        if(ttEditIndex === idx) cancelEditTT();
+        renderTTProgramados();
+      });
+      ttProgramadosListEl.appendChild(item);
+    });
+  }
+
+  function clearTTEntry(){
+    fTTCodigo.value = '';
+    fTTOperador.value = '';
+    fTTCc.value = '';
+    fTTCodigo.focus();
+  }
+
+  function startEditTT(idx){
+    var tt = ttProgramados[idx];
+    ttEditIndex = idx;
+    fTTCodigo.value = tt.codigo;
+    fTTOperador.value = tt.operador;
+    fTTCc.value = tt.cc;
+    btnProgramarTT.textContent = 'Guardar cambios';
+    fieldCancelarTT.style.display = '';
+    fTTCodigo.focus();
+    renderTTProgramados();
+  }
+
+  function cancelEditTT(){
+    ttEditIndex = null;
+    btnProgramarTT.textContent = 'Programar';
+    fieldCancelarTT.style.display = 'none';
+    clearTTEntry();
+    renderTTProgramados();
+  }
+  document.getElementById('btnCancelarTT').addEventListener('click', cancelEditTT);
+
+  btnProgramarTT.addEventListener('click', function(){
+    var codigo = fTTCodigo.value.trim();
+    var operador = fTTOperador.value.trim().toUpperCase();
+    var cc = fTTCc.value.trim();
+    if(!codigo || !operador || !cc){
+      showToast('Diligencia TT #, Nombre y Cédula para poder programar.');
+      return;
+    }
+    var dupIdx = ttProgramados.findIndex(function(tt){ return tt.codigo === codigo; });
+    if(dupIdx !== -1 && dupIdx !== ttEditIndex){
+      showToast('El TT #'+codigo+' ya está programado.');
+      return;
+    }
+    if(ttEditIndex !== null){
+      ttProgramados[ttEditIndex] = {codigo: codigo, operador: operador, cc: cc};
+      showToast('TT actualizado.');
+      cancelEditTT();
+    }else{
+      ttProgramados.push({codigo: codigo, operador: operador, cc: cc});
+      showToast('TT agregado a Vehículos programados.');
+      clearTTEntry();
+      renderTTProgramados();
+    }
+  });
+
+  function resetForm(){
+    document.getElementById('fOrigen').value = 'TECNOBELL - BSE';
+    document.getElementById('fDestino').value = 'BODEGA 3';
+    document.getElementById('fFecha').value = todayISO();
+    currentRecordId = null;
+    currentCreatedAt = null;
+    saveCurrentTraslado();
+    hydratedFromRecord = true;
+    cancelEditTT();
+    ttProgramados = [];
+    renderTTProgramados();
+    cancelEditItem();
+    itemsProgramados = [];
+    renderItemsProgramados();
+  }
+
+  document.getElementById('btnFinalizarTraslado').addEventListener('click', async function(){
+    if(!currentRecordId){
+      if(ttProgramados.length || itemsProgramados.length){
+        resetForm();
+        showToast('Formulario limpiado. Aún no se había guardado ninguna programación.');
+      }else{
+        showToast('No hay ningún traslado activo para finalizar.');
+      }
+      return;
+    }
+    var existingRec = (typeof lastRecords !== 'undefined' && lastRecords)
+      ? lastRecords.find(function(r){ return r.id === currentRecordId; })
+      : null;
+    var ttsCargados = existingRec ? (existingRec.tts||[]).filter(function(tt){ return tt.estado === 'cargado'; }) : [];
+
+    if(ttsCargados.length){
+      var lista = ttsCargados.map(function(tt){ return 'TT# '+tt.codigo; }).join(', ');
+      var eleccion = await customChoice(
+        'Estos TT siguen cargados: '+lista+'. ¿Qué hacemos con su carga antes de finalizar?\n\n'+
+        '"Reversar" devuelve la cantidad al BL de donde se tomó.\n'+
+        '"Liberar" deja la cantidad ya descontada, como si se hubiera entregado.',
+        [
+          {key:'reversar', label:'Reversar y finalizar'},
+          {key:'liberar', label:'Liberar y finalizar'},
+          {key:'cancelar', label:'Cancelar', ghost:true}
+        ]
+      );
+      if(!eleccion || eleccion === 'cancelar') return;
+
+      if(eleccion === 'reversar'){
+        var items = (existingRec.items||[]).slice();
+        ttsCargados.forEach(function(tt){
+          if(tt.currentBl){
+            items = items.map(function(it){
+              if(it.bl === tt.currentBl){
+                var restante = (it.restante != null ? it.restante : it.cantidad) + Number(tt.currentCantidad || 0);
+                return {bl: it.bl, cantidad: it.cantidad, restante: Math.min(it.cantidad, restante)};
+              }
+              return it;
+            });
+          }
+        });
+        try{
+          await updateRecordFields(currentRecordId, {items: items});
+        }catch(e){
+          showToast('No se pudo reversar la carga. Intenta de nuevo.');
+          return;
+        }
+      }
+    }else{
+      var okLibre = await customConfirm('¿Finalizar este traslado? Los vehículos libres ya no podrán cargarse en él.');
+      if(!okLibre) return;
+    }
+
+    try{
+      await deleteRecord(currentRecordId);
+      showToast('Traslado finalizado.');
+    }catch(e){
+      showToast('No se pudo finalizar el traslado. Intenta de nuevo.');
+      return;
+    }
+    resetForm();
+  });
+
+  function collectForm(){
+    var origen = document.getElementById('fOrigen').value.trim().toUpperCase();
+    var destino = document.getElementById('fDestino').value.trim().toUpperCase();
+    var fecha = document.getElementById('fFecha').value;
+
+    var tts = ttProgramados.slice();
+    var items = itemsProgramados.slice();
+
+    return {origen: origen, destino: destino, fecha: fecha, tts: tts, items: items};
+  }
+
+  function validate(data){
+    var errs = [];
+    if(data.fecha && data.fecha < todayISO()) errs.push('La fecha no puede ser anterior a hoy.');
+    if(!data.origen) errs.push('Indica el origen.');
+    if(!data.destino) errs.push('Indica el destino.');
+    if(!data.tts.length) errs.push('Agrega al menos un TT.');
+    data.tts.forEach(function(tt, i){
+      if(!tt.codigo) errs.push('Falta el código del TT #'+(i+1)+'.');
+      if(!tt.operador) errs.push('Falta el nombre del operador del TT #'+(i+1)+'.');
+    });
+    if(!data.items.length) errs.push('Agrega al menos un BL con su cantidad.');
+    return errs;
+  }
+
+  function buildEmailText(data){
+    var codigos = data.tts.map(function(t){ return 'TT'+t.codigo; }).join(', ');
+    var lines = [];
+    lines.push('Buen día');
+    lines.push('Sres. Seguridad');
+    lines.push('');
+    lines.push('Permitir salida e ingreso por zona franca a los siguientes ' + codigos + ' para traslado de carga suelta desde ' + data.origen + ' hacia ' + data.destino + '.');
+    if(data.fecha){
+      lines.push('Fecha programada: ' + fmtFecha(data.fecha));
+    }
+    lines.push('');
+    data.tts.forEach(function(tt){
+      lines.push('TT' + tt.codigo + ' — OPERADOR: ' + tt.operador.toUpperCase() + ' — CC ' + tt.cc);
+    });
+    lines.push('');
+    lines.push('Bl        Cant.');
+    data.items.forEach(function(it){
+      lines.push(it.bl + '        ' + it.cantidad);
+    });
+    lines.push('');
+    lines.push('Quedamos atentos.');
+    return lines.join('\n');
+  }
+
+  var CURRENT_TRASLADO_KEY = 'spb_current_traslado_v1';
+  function loadCurrentTraslado(){
+    try{
+      var raw = localStorage.getItem(CURRENT_TRASLADO_KEY);
+      if(!raw) return;
+      var obj = JSON.parse(raw);
+      currentRecordId = obj.id || null;
+      currentCreatedAt = obj.createdAt || null;
+    }catch(e){}
+  }
+  function saveCurrentTraslado(){
+    try{
+      if(currentRecordId){
+        localStorage.setItem(CURRENT_TRASLADO_KEY, JSON.stringify({id: currentRecordId, createdAt: currentCreatedAt}));
+      }else{
+        localStorage.removeItem(CURRENT_TRASLADO_KEY);
+      }
+    }catch(e){}
+  }
+
+  var currentRecordId = null;
+  var currentCreatedAt = null;
+  var syncTimer = null;
+  loadCurrentTraslado();
+
+  function scheduleAutoSync(){
+    clearTimeout(syncTimer);
+    syncTimer = setTimeout(autoSync, 500);
+  }
+
+  ['fOrigen','fDestino','fFecha'].forEach(function(id){
+    document.getElementById(id).addEventListener('input', scheduleAutoSync);
+    document.getElementById(id).addEventListener('change', scheduleAutoSync);
+  });
+
+  async function autoSync(){
+    var data = collectForm();
+    var hasContent = data.tts.length || data.items.length;
+
+    if(!hasContent){
+      if(currentRecordId){
+        try{ await deleteRecord(currentRecordId); }catch(e){}
+        currentRecordId = null;
+        currentCreatedAt = null;
+        saveCurrentTraslado();
+      }
+      return;
+    }
+
+    var errs = validate(data);
+    if(errs.length) return; /* aún incompleto: no se sincroniza todavía */
+
+    /* Estado real en la base (incluye lo que acaba de hacer Operativo) */
+    var existing = null;
+    if(currentRecordId){
+      try{ existing = await getRecordFresh(currentRecordId); }catch(e){ existing = null; }
+      if(!existing && lastRecords){
+        existing = lastRecords.find(function(r){ return r.id === currentRecordId; }) || null;
+      }
+    }
+
+    var tts = data.tts.map(function(tt){
+      var old = existing && existing.tts ? existing.tts.find(function(o){ return o.codigo === tt.codigo; }) : null;
+      return {
+        codigo: tt.codigo,
+        operador: tt.operador,
+        cc: tt.cc,
+        estado: (old && old.estado) || 'libre',
+        currentBl: old ? (old.currentBl || null) : null,
+        currentCantidad: old ? (old.currentCantidad || null) : null
+      };
+    });
+
+    /* Si Administrativo quita un TT que estaba cargado, su cantidad vuelve al BL */
+    var removedLoads = (existing && existing.tts ? existing.tts : []).filter(function(o){
+      return o.estado === 'cargado' && o.currentBl &&
+        !data.tts.some(function(t){ return t.codigo === o.codigo; });
+    });
+
+    var items = data.items.map(function(it){
+      var old = existing && existing.items ? existing.items.find(function(o){ return o.bl === it.bl; }) : null;
+      var restante = Number(it.cantidad);
+      if(old){
+        /* conserva lo ya cargado/liberado; si cambió la cantidad, ajusta la diferencia */
+        var oldRest = old.restante != null ? Number(old.restante) : Number(old.cantidad);
+        restante = oldRest + (Number(it.cantidad) - Number(old.cantidad));
+      }
+      removedLoads.forEach(function(o){
+        if(o.currentBl === it.bl) restante += Number(o.currentCantidad || 0);
+      });
+      restante = Math.max(0, Math.min(Number(it.cantidad), restante));
+      return {bl: it.bl, cantidad: it.cantidad, restante: restante};
+    });
+
+    var text = buildEmailText(data);
+    var record = {
+      id: currentRecordId || uid('prog'),
+      origen: data.origen,
+      destino: data.destino,
+      fecha: data.fecha,
+      tts: tts,
+      items: items,
+      texto: text,
+      estado: calcEstado({tts: tts, items: items}),
+      createdAt: currentCreatedAt || Date.now()
+    };
+    try{
+      await saveRecord(record);
+      currentRecordId = record.id;
+      currentCreatedAt = record.createdAt;
+      saveCurrentTraslado();
+    }catch(e){ console.error('Error al sincronizar programación:', e); }
+  }
+
+  /* ---------------------------------------------------------
+     Render de listas (Admin y Operativo)
+  --------------------------------------------------------- */
+  var ESTADO_LABEL = {pendiente:'Pendiente', programado:'Programado', atendido:'Atendido'};
+
+  function findTT(rec, codigo){
+    return (rec.tts||[]).find(function(t){ return t.codigo === codigo; });
+  }
+
+  /* Carga: el TT toma una cantidad de un BL (baja el "faltan" de ese BL) */
+  async function cargarTT(r, ttCodigo, bl, cantidad){
+    var tt = findTT(r, ttCodigo);
+    var quienNombre = currentSession ? currentSession.nombre : null;
+    var ok = await mutateRecord(r.id, function(cur){
+      var tt = findTT(cur, ttCodigo);
+      if(!tt) return {error: 'El TT# '+ttCodigo+' ya no está en esta programación.'};
+      if(tt.estado === 'cargado') return {error: 'El TT# '+ttCodigo+' ya está cargado.'};
+      var it = (cur.items||[]).find(function(i){ return i.bl === bl; });
+      if(!it) return {error: 'El BL '+bl+' ya no existe en esta programación.'};
+      var disp = it.restante != null ? Number(it.restante) : Number(it.cantidad);
+      if(cantidad > disp) return {error: 'Esa cantidad supera lo que falta de ese BL ('+disp+').'};
+      return {
+        fields: {
+          tts: (cur.tts||[]).map(function(t){
+            return t.codigo === ttCodigo
+              ? {codigo: t.codigo, operador: t.operador, cc: t.cc, estado: 'cargado', currentBl: bl, currentCantidad: cantidad, ultimoPor: quienNombre, ultimaAccion: 'Cargado'}
+              : t;
+          }),
+          items: (cur.items||[]).map(function(i){
+            return i.bl === bl ? {bl: i.bl, cantidad: i.cantidad, restante: Math.max(0, disp - cantidad)} : i;
+          })
+        },
+        message: 'TT# '+ttCodigo+' cargado con Bl '+bl+'.'
+      };
+    });
+    if(ok){
+      logMovimiento({
+        accion: 'cargar',
+        programacion_id: r.id,
+        origen: r.origen,
+        destino: r.destino,
+        tt_codigo: ttCodigo,
+        tt_operador: tt ? tt.operador : null,
+        tt_cc: tt ? tt.cc : null,
+        bl: bl,
+        cantidad: cantidad
+      });
+    }
+  }
+
+  /* Historial de movimientos: queda guardado por separado, para
+     poder consultarlo después aunque la programación se finalice.
+     Cubre cargar, reversar, liberar y quitar TT.
+     Si no hay Supabase configurado, simplemente no se registra
+     (la app sigue funcionando igual para todo lo demás). */
+  async function logMovimiento(datos){
+    if(!supabaseConfigured || !supabaseClient) return;
+    var quien = usuariosCache.find(function(u){ return currentSession && u.id === currentSession.id; });
+    try{
+      await supabaseClient.from('despachos').insert({
+        accion: datos.accion,
+        programacion_id: datos.programacion_id,
+        origen: datos.origen,
+        destino: datos.destino,
+        tt_codigo: datos.tt_codigo,
+        tt_operador: datos.tt_operador,
+        tt_cc: datos.tt_cc,
+        bl: datos.bl || null,
+        cantidad: datos.cantidad || null,
+        despachado_por: currentSession ? currentSession.nombre : null,
+        despachado_por_usuario: quien ? quien.usuario : null,
+        despachado_por_rol: currentSession ? currentSession.rol : null
+      });
+    }catch(e){
+      console.error('No se pudo registrar el movimiento en el historial:', e);
+    }
+  }
+
+  /* REVERSAR: se deshace la carga. La cantidad VUELVE al BL de donde se tomó. */
+  async function reversarCarga(r, ttCodigo){
+    var t0 = findTT(r, ttCodigo);
+    var detalle = (t0 && t0.currentBl) ? ' Las '+t0.currentCantidad+' unidades vuelven al BL '+t0.currentBl+'.' : '';
+    var ok = await customConfirm('¿Reversar la carga del TT# '+ttCodigo+'?'+detalle);
+    if(!ok) return;
+    var quienNombre = currentSession ? currentSession.nombre : null;
+    var blOrig = t0 ? t0.currentBl : null, cantOrig = t0 ? t0.currentCantidad : null;
+    var ok2 = await mutateRecord(r.id, function(cur){
+      var tt = findTT(cur, ttCodigo);
+      if(!tt) return {error: 'El TT# '+ttCodigo+' ya no está en esta programación.'};
+      if(tt.estado !== 'cargado') return {error: 'El TT# '+ttCodigo+' ya no está cargado (alguien más lo actualizó).'};
+      var bl = tt.currentBl, cant = Number(tt.currentCantidad || 0);
+      var items = (cur.items||[]).map(function(it){
+        if(it.bl === bl){
+          var restante = (it.restante != null ? Number(it.restante) : Number(it.cantidad)) + cant;
+          return {bl: it.bl, cantidad: it.cantidad, restante: Math.min(Number(it.cantidad), restante)};
+        }
+        return it;
+      });
+      return {
+        fields: {
+          tts: (cur.tts||[]).map(function(t){
+            return t.codigo === ttCodigo
+              ? {codigo: t.codigo, operador: t.operador, cc: t.cc, estado: 'libre', currentBl: null, currentCantidad: null, ultimoPor: quienNombre, ultimaAccion: 'Reversado'}
+              : t;
+          }),
+          items: items
+        },
+        message: 'Carga del TT# '+ttCodigo+' reversada. '+cant+' unidades volvieron al BL '+bl+'.'
+      };
+    });
+    if(ok2){
+      logMovimiento({
+        accion: 'reversar', programacion_id: r.id, origen: r.origen, destino: r.destino,
+        tt_codigo: ttCodigo, tt_operador: t0 ? t0.operador : null, tt_cc: t0 ? t0.cc : null,
+        bl: blOrig, cantidad: cantOrig
+      });
+    }
+  }
+
+  /* LIBERAR: el TT queda libre para otra carga, pero la cantidad que llevó NO vuelve al BL. */
+  async function liberarCarga(r, ttCodigo){
+    var t0 = findTT(r, ttCodigo);
+    var detalle = (t0 && t0.currentBl) ? ' Las '+t0.currentCantidad+' unidades del BL '+t0.currentBl+' NO vuelven al BL.' : '';
+    var ok = await customConfirm('¿Liberar el TT# '+ttCodigo+'?'+detalle);
+    if(!ok) return;
+    var quienNombre = currentSession ? currentSession.nombre : null;
+    var blOrig = t0 ? t0.currentBl : null, cantOrig = t0 ? t0.currentCantidad : null;
+    var ok2 = await mutateRecord(r.id, function(cur){
+      var tt = findTT(cur, ttCodigo);
+      if(!tt) return {error: 'El TT# '+ttCodigo+' ya no está en esta programación.'};
+      if(tt.estado !== 'cargado') return {error: 'El TT# '+ttCodigo+' ya no está cargado (alguien más lo actualizó).'};
+      return {
+        fields: {
+          tts: (cur.tts||[]).map(function(t){
+            return t.codigo === ttCodigo
+              ? {codigo: t.codigo, operador: t.operador, cc: t.cc, estado: 'libre', currentBl: null, currentCantidad: null, ultimoPor: quienNombre, ultimaAccion: 'Liberado'}
+              : t;
+          })
+        },
+        message: 'TT# '+ttCodigo+' liberado. La cantidad no vuelve al BL.'
+      };
+    });
+    if(ok2){
+      logMovimiento({
+        accion: 'liberar', programacion_id: r.id, origen: r.origen, destino: r.destino,
+        tt_codigo: ttCodigo, tt_operador: t0 ? t0.operador : null, tt_cc: t0 ? t0.cc : null,
+        bl: blOrig, cantidad: cantOrig
+      });
+    }
+  }
+
+  /* QUITAR: saca un TT libre de la programación (antes se llamaba "Liberar TT") */
+  async function quitarTT(r, ttCodigo){
+    var ok = await customConfirm('¿Quitar el TT# '+ttCodigo+' de esta programación?');
+    if(!ok) return;
+    var t0 = findTT(r, ttCodigo);
+    var quienNombre = currentSession ? currentSession.nombre : null;
+    var ok2 = await mutateRecord(r.id, function(cur){
+      var tt = findTT(cur, ttCodigo);
+      if(!tt) return {error: 'El TT# '+ttCodigo+' ya no está en esta programación.'};
+      if(tt.estado === 'cargado') return {error: 'El TT# '+ttCodigo+' está cargado: primero reversa o libera su carga.'};
+      return {
+        fields: {tts: (cur.tts||[]).filter(function(t){ return t.codigo !== ttCodigo; })},
+        message: 'TT# '+ttCodigo+' quitado de la programación.'
+      };
+    });
+    if(ok2){
+      logMovimiento({
+        accion: 'quitar_tt', programacion_id: r.id, origen: r.origen, destino: r.destino,
+        tt_codigo: ttCodigo, tt_operador: t0 ? t0.operador : null, tt_cc: t0 ? t0.cc : null
+      });
+    }
+  }
+
+  var collapsedState = {};
+
+  function startEditRoute(r, headEl){
+    var left = headEl.querySelector('.route').parentElement;
+    left.innerHTML =
+      '<div class="grid3" style="margin-bottom:0;">'+
+        '<div class="field" style="margin-bottom:6px;"><label>Origen</label><input type="text" class="edit-origen" value="'+esc(r.origen)+'"></div>'+
+        '<div class="field" style="margin-bottom:6px;"><label>Destino</label><input type="text" class="edit-destino" value="'+esc(r.destino)+'"></div>'+
+        '<div class="field" style="margin-bottom:6px;"><label>Fecha</label><input type="date" class="edit-fecha" value="'+esc(r.fecha||'')+'"></div>'+
+      '</div>'+
+      '<div class="btn-row" style="margin-top:8px;">'+
+        '<button type="button" class="btn btn-sm btn-guardar-route">Guardar</button>'+
+        '<button type="button" class="btn ghost btn-sm btn-cancelar-route">Cancelar</button>'+
+      '</div>';
+
+    left.querySelector('.btn-cancelar-route').addEventListener('click', function(){
+      onRecords(lastRecords, true); /* vuelve a pintar todo tal como está en la base */
+    });
+    left.querySelector('.btn-guardar-route').addEventListener('click', async function(){
+      var origen = left.querySelector('.edit-origen').value.trim().toUpperCase();
+      var destino = left.querySelector('.edit-destino').value.trim().toUpperCase();
+      var fecha = left.querySelector('.edit-fecha').value;
+      if(!origen || !destino){
+        showToast('Origen y destino no pueden quedar vacíos.');
+        return;
+      }
+      try{
+        await updateRecordFields(r.id, {origen: origen, destino: destino, fecha: fecha});
+        showToast('Programación actualizada.');
+      }catch(e){
+        showToast('No se pudo actualizar.');
+      }
+    });
+  }
+
+  function recordCard(r, opts){
+    opts = opts || {};
+    var div = document.createElement('div');
+    div.className = 'rec-card';
+
+    var when = new Date(r.createdAt);
+    var whenStr = pad(when.getDate())+'/'+pad(when.getMonth()+1)+'/'+when.getFullYear()+' '+pad(when.getHours())+':'+pad(when.getMinutes());
+
+    var head = document.createElement('div');
+    head.className = 'rec-head';
+    head.innerHTML =
+      '<div>'+
+        '<div class="route">'+esc(r.origen)+' &rarr; '+esc(r.destino)+'</div>'+
+        '<div class="meta">'+(r.fecha? 'Programado: '+esc(fmtFecha(r.fecha))+' &middot; ' : '')+'enviado '+whenStr+'</div>'+
+      '</div>';
+
+    var right = document.createElement('div');
+    right.style.display = 'flex';
+    right.style.alignItems = 'center';
+    right.style.gap = '8px';
+
+    var estadoAuto = calcEstado(r);
+    var badge = document.createElement('span');
+    badge.className = 'badge ' + estadoAuto;
+    badge.textContent = ESTADO_LABEL[estadoAuto];
+    right.appendChild(badge);
+
+    if(opts.editableRoute){
+      var editRouteBtn = document.createElement('button');
+      editRouteBtn.className = 'icon-btn';
+      editRouteBtn.title = 'Editar origen / destino / fecha';
+      editRouteBtn.style.color = 'var(--spb-blue)';
+      editRouteBtn.innerHTML = '&#9998;';
+      editRouteBtn.addEventListener('click', function(){
+        startEditRoute(r, head);
+      });
+      right.appendChild(editRouteBtn);
+    }
+
+    if(opts.deletable){
+      var delBtn = document.createElement('button');
+      delBtn.className = 'icon-btn';
+      delBtn.title = 'Eliminar';
+      delBtn.innerHTML = '&times;';
+      delBtn.addEventListener('click', async function(){
+        var ok = await customConfirm('¿Eliminar esta programación por completo? Se perderán sus TT y BL.');
+        if(ok){
+          try{ await deleteRecord(r.id); showToast('Programación eliminada.'); }
+          catch(e){ showToast('No se pudo eliminar.'); }
+        }
+      });
+      right.appendChild(delBtn);
+    }
+
+    head.appendChild(right);
+    div.appendChild(head);
+
+    if((r.tts||[]).length){
+      var ttListDiv = document.createElement('div');
+      var ttKey = r.id + ':tt';
+      ttListDiv.className = 'rec-tt rec-sec sec-tt collapsible' + (collapsedState[ttKey] ? ' collapsed' : '');
+      var ttHtml = '<div class="tt-title collapsible-title"><span>Vehículos (TT)<span class="tt-count">'+(r.tts||[]).length+'</span></span> <span class="chevron">&#9662;</span></div><div class="collapsible-content">';
+      (r.tts||[]).forEach(function(tt){
+        var cargado = tt.estado === 'cargado';
+        ttHtml += '<div class="tt-op-row">'+
+          '<div class="tt-op-info"><b>TT# '+esc(tt.codigo)+'</b> &middot; '+esc(tt.operador)+' &middot; CC '+esc(tt.cc)+
+          (cargado ? ' &middot; <span class="badge cargado">Cargado</span>' : ' &middot; <span class="badge libre-badge">Libre</span>')+
+          (tt.ultimoPor ? '<div class="tt-op-meta">'+esc(tt.ultimaAccion||'Movimiento')+' por <b>'+esc(tt.ultimoPor)+'</b></div>' : '')+
+          '</div>';
+        if(opts.editableStatus){
+          ttHtml += '<div class="tt-op-actions" data-tt="'+esc(tt.codigo)+'">'+
+            '<button type="button" class="btn danger btn-sm btn-quitar-tt"'+(cargado ? ' disabled title="Primero reversa o libera la carga desde \'Cargas\' para poder quitarlo"' : '')+'>Quitar TT</button>'+
+          '</div>';
+        }
+        ttHtml += '</div>';
+      });
+      ttHtml += '</div>';
+      ttListDiv.innerHTML = ttHtml;
+      ttListDiv.querySelector('.collapsible-title').addEventListener('click', function(){
+        ttListDiv.classList.toggle('collapsed');
+        collapsedState[ttKey] = ttListDiv.classList.contains('collapsed');
+      });
+      div.appendChild(ttListDiv);
+
+      if(opts.editableStatus){
+        ttListDiv.querySelectorAll('.btn-quitar-tt').forEach(function(btn){
+          if(btn.disabled) return;
+          var codigo = btn.closest('.tt-op-actions').dataset.tt;
+          btn.addEventListener('click', function(){ quitarTT(r, codigo); });
+        });
+      }
+    }
+
+    if((r.items||[]).length){
+      var itemsDiv = document.createElement('div');
+      var blKey = r.id + ':bl';
+      itemsDiv.className = 'rec-tt rec-sec sec-bl collapsible' + (collapsedState[blKey] ? ' collapsed' : '');
+      var rows = (r.items||[]).map(function(it){
+        var restante = it.restante != null ? it.restante : it.cantidad;
+        var completo = Number(restante) <= 0;
+        if(completo){
+          return '<div class="bl-row bl-completo"><span class="bl-name">Bl '+esc(it.bl)+'</span><span class="n">Cant. '+esc(it.cantidad)+'</span><span class="bl-completo-label">BL COMPLETO - SE TRASLADÓ</span></div>';
+        }
+        return '<div class="bl-row"><span class="bl-name">Bl '+esc(it.bl)+'</span><span class="n">Cant. '+esc(it.cantidad)+'</span><span class="n">Faltan '+esc(restante)+'</span></div>';
+      }).join('');
+      itemsDiv.innerHTML =
+        '<div class="tt-title collapsible-title"><span>BL y cantidad<span class="tt-count">'+(r.items||[]).length+'</span></span> <span class="chevron">&#9662;</span></div>'+
+        '<div class="collapsible-content">'+rows+'</div>';
+      itemsDiv.querySelector('.collapsible-title').addEventListener('click', function(){
+        itemsDiv.classList.toggle('collapsed');
+        collapsedState[blKey] = itemsDiv.classList.contains('collapsed');
+      });
+      div.appendChild(itemsDiv);
+    }
+
+    if(opts.editableStatus){
+      var ttsLibres = (r.tts||[]).filter(function(tt){ return tt.estado !== 'cargado'; });
+      var itemsConRestante = (r.items||[]).filter(function(it){ return (it.restante != null ? it.restante : it.cantidad) > 0; });
+      if(ttsLibres.length && itemsConRestante.length){
+        var cargaDiv = document.createElement('div');
+        cargaDiv.className = 'rec-tt rec-sec sec-carga carga-form';
+        cargaDiv.dataset.recId = r.id;
+        var ttOptions = ttsLibres.map(function(tt){ return '<option value="'+esc(tt.codigo)+'">TT# '+esc(tt.codigo)+' - '+esc(tt.operador)+'</option>'; }).join('');
+        var blOptions = itemsConRestante.map(function(it){
+          var restante = it.restante != null ? it.restante : it.cantidad;
+          return '<option value="'+esc(it.bl)+'">Bl '+esc(it.bl)+' (faltan '+esc(restante)+')</option>';
+        }).join('');
+        cargaDiv.innerHTML =
+          '<div class="tt-title">Cargar</div>'+
+          '<div class="carga-row">'+
+            '<select class="sel-carga-tt">'+ttOptions+'</select>'+
+            '<select class="sel-carga-bl">'+blOptions+'</select>'+
+            '<input type="text" inputmode="numeric" class="inp-carga-cant" placeholder="Cant.">'+
+            '<button type="button" class="btn btn-sm btn-cargar">Cargar</button>'+
+          '</div>';
+        div.appendChild(cargaDiv);
+
+        var selBl = cargaDiv.querySelector('.sel-carga-bl');
+        var inpCant = cargaDiv.querySelector('.inp-carga-cant');
+        function syncMax(){
+          var it = itemsConRestante.find(function(i){ return i.bl === selBl.value; });
+          var restante = it ? (it.restante != null ? it.restante : it.cantidad) : 0;
+          inpCant.placeholder = 'Máx. ' + restante;
+        }
+        selBl.addEventListener('change', syncMax);
+        syncMax();
+        inpCant.addEventListener('input', function(){
+          inpCant.value = inpCant.value.replace(/\D/g, '');
+        });
+
+        cargaDiv.querySelector('.btn-cargar').addEventListener('click', function(){
+          var ttCodigo = cargaDiv.querySelector('.sel-carga-tt').value;
+          var bl = selBl.value;
+          var cantidad = parseInt(inpCant.value, 10);
+          var itemRef = itemsConRestante.find(function(i){ return i.bl === bl; });
+          var restanteDisponible = itemRef ? (itemRef.restante != null ? itemRef.restante : itemRef.cantidad) : 0;
+          if(!cantidad || cantidad <= 0){
+            showToast('Indica una cantidad válida.');
+            return;
+          }
+          if(cantidad > restanteDisponible){
+            showToast('Esa cantidad supera lo que falta de ese BL ('+restanteDisponible+').');
+            return;
+          }
+          cargarTT(r, ttCodigo, bl, cantidad);
+        });
+      }
+    }
+
+    var ttsCargados = (r.tts||[]).filter(function(tt){ return tt.estado === 'cargado'; });
+    if(ttsCargados.length){
+      var cargasDiv = document.createElement('div');
+      cargasDiv.className = 'rec-tt rec-sec sec-cargas';
+      var cargasHtml = '<div class="tt-title"><span>Cargas<span class="tt-count">'+ttsCargados.length+'</span></span></div>';
+      ttsCargados.forEach(function(tt){
+        cargasHtml += '<div class="tt-programado-item" data-tt="'+esc(tt.codigo)+'">'+
+          '<div class="info"><b>TT# '+esc(tt.codigo)+'</b> - Bl '+esc(tt.currentBl)+' - Cant. '+esc(tt.currentCantidad)+
+          (tt.ultimoPor ? '<div class="tt-op-meta">Cargado por <b>'+esc(tt.ultimoPor)+'</b></div>' : '')+
+          '</div>'+
+          (opts.editableStatus ?
+            '<div class="carga-actions">'+
+              '<button type="button" class="btn danger btn-sm btn-reversar">Reversar</button>'+
+              '<button type="button" class="btn secondary btn-sm btn-liberar-carga">Liberar</button>'+
+            '</div>' : '')+
+          '</div>';
+      });
+      cargasDiv.innerHTML = cargasHtml;
+      div.appendChild(cargasDiv);
+
+      if(opts.editableStatus){
+        cargasDiv.querySelectorAll('.btn-reversar').forEach(function(btn){
+          var codigo = btn.closest('.tt-programado-item').dataset.tt;
+          btn.addEventListener('click', function(){ reversarCarga(r, codigo); });
+        });
+        cargasDiv.querySelectorAll('.btn-liberar-carga').forEach(function(btn){
+          var codigo = btn.closest('.tt-programado-item').dataset.tt;
+          btn.addEventListener('click', function(){ liberarCarga(r, codigo); });
+        });
+      }
+    }
+
+    return div;
+  }
+
+  function renderList(container, records, opts){
+    container.innerHTML = '';
+    if(!records.length){
+      var empty = document.createElement('div');
+      empty.className = 'empty';
+      empty.innerHTML = '<div class="big">&#128230;</div>Aún no hay programaciones.';
+      container.appendChild(empty);
+      return;
+    }
+    records.forEach(function(r){
+      container.appendChild(recordCard(r, opts));
+    });
+  }
+
+  var listOpEl = document.getElementById('listOp');
+  var listVerEl = document.getElementById('listVer');
+  var lastRecords = [];
+  var hydratedFromRecord = false;
+
+  function hydrateAdminFromCurrent(records){
+    if(hydratedFromRecord || !currentRecordId) return;
+    var existing = records.find(function(r){ return r.id === currentRecordId; });
+    if(!existing) return;
+    hydratedFromRecord = true;
+
+    document.getElementById('fOrigen').value = existing.origen || 'TECNOBELL - BSE';
+    document.getElementById('fDestino').value = existing.destino || 'BODEGA 3';
+    document.getElementById('fFecha').value = existing.fecha || todayISO();
+
+    ttProgramados = (existing.tts || []).map(function(tt){
+      return {codigo: tt.codigo, operador: tt.operador, cc: tt.cc};
+    });
+    renderTTProgramados();
+
+    itemsProgramados = (existing.items || []).map(function(it){
+      return {bl: it.bl, cantidad: it.cantidad};
+    });
+    renderItemsProgramados();
+  }
+
+  var listAdminTrasladosEl = document.getElementById('listAdminTraslados');
+
+  var listAdministradorProgEl = document.getElementById('listAdministradorProg');
+
+  var lastRecordsSig = null;
+
+  /* Al llegar un cambio en vivo se repinta todo; esto conserva lo que la persona
+     estaba llenando en el formulario "Cargar" (TT, BL y cantidad) y el foco. */
+  function captureCargaState(){
+    var st = {};
+    document.querySelectorAll('.carga-form[data-rec-id]').forEach(function(f){
+      var inp = f.querySelector('.inp-carga-cant');
+      st[f.dataset.recId] = {
+        tt: f.querySelector('.sel-carga-tt').value,
+        bl: f.querySelector('.sel-carga-bl').value,
+        cant: inp.value,
+        focus: document.activeElement === inp
+      };
+    });
+    return st;
+  }
+  function restoreCargaState(st){
+    document.querySelectorAll('.carga-form[data-rec-id]').forEach(function(f){
+      var s0 = st[f.dataset.recId];
+      if(!s0) return;
+      var selTT = f.querySelector('.sel-carga-tt');
+      var selBl = f.querySelector('.sel-carga-bl');
+      var inp = f.querySelector('.inp-carga-cant');
+      if(Array.prototype.some.call(selTT.options, function(o){ return o.value === s0.tt; })) selTT.value = s0.tt;
+      if(Array.prototype.some.call(selBl.options, function(o){ return o.value === s0.bl; })) selBl.value = s0.bl;
+      selBl.dispatchEvent(new Event('change'));
+      inp.value = s0.cant;
+      if(s0.focus){
+        inp.focus();
+        try{ inp.setSelectionRange(inp.value.length, inp.value.length); }catch(e){}
+      }
+    });
+  }
+
+  var rawRecords = [];
+  var purging = {};
+
+  /* Quita de la pantalla y de la base lo que ya venció (23:59 del día programado) */
+  function purgeExpired(list){
+    list.forEach(function(r){
+      if(purging[r.id]) return;
+      purging[r.id] = true;
+      deleteRecord(r.id).catch(function(){}).then(function(){
+        setTimeout(function(){ delete purging[r.id]; }, 15000);
+      });
+      if(r.id === currentRecordId){ resetForm(); }
+    });
+  }
+
+  function onRecords(records, force){
+    rawRecords = records || [];
+    var vencidas = rawRecords.filter(isExpired);
+    if(vencidas.length) purgeExpired(vencidas);
+    records = rawRecords.filter(function(r){ return !isExpired(r); });
+    records = records.slice().sort(function(a,b){ return (b.createdAt||0)-(a.createdAt||0); });
+    var sig = JSON.stringify(records);
+    if(!force && sig === lastRecordsSig) return; /* nada cambió: no repintar */
+    lastRecordsSig = sig;
+    lastRecords = records;
+    hydrateAdminFromCurrent(records);
+    var saved = captureCargaState();
+    renderList(listOpEl, records, {deletable:false, editableStatus:true});
+    renderList(listVerEl, records, {deletable:false, editableStatus:false});
+    renderList(listAdministradorProgEl, records, {deletable:false, editableStatus:false});
+    renderList(listAdminTrasladosEl, records, {deletable:true, editableStatus:false, editableRoute:true});
+    restoreCargaState(saved);
+  }
+
+  /* Revisa cada 20 s si alguna programación llegó a las 23:59 */
+  setInterval(function(){
+    if(rawRecords.some(isExpired)) onRecords(rawRecords, true);
+  }, 20000);
+
+  document.getElementById('btnRefreshOp').addEventListener('click', function(){ onRecords(lastRecords, true); showToast('Actualizado.'); });
+  document.getElementById('btnRefreshAdminTraslados').addEventListener('click', function(){ onRecords(lastRecords, true); showToast('Actualizado.'); });
+
+  /* ---------------------------------------------------------
+     Historial de despachos: consulta por fecha (solo Admin)
+  --------------------------------------------------------- */
+  document.getElementById('fDespachoFecha').valueAsDate = new Date();
+
+  function renderDespachos(rows){
+    var el = document.getElementById('listDespachos');
+    el.innerHTML = '';
+    if(!rows.length){
+      el.className = 'empty-inline';
+      el.textContent = 'No hay movimientos registrados en esa fecha.';
+      return;
+    }
+    el.className = '';
+    var ACCION_LABEL = {cargar:'Cargó', reversar:'Reversó', liberar:'Liberó', quitar_tt:'Quitó TT'};
+    var table = document.createElement('table');
+    table.className = 'items';
+    var thead = '<thead><tr><th>Hora</th><th>Acción</th><th>TT</th><th>Bl</th><th>Cant.</th><th>Realizado por</th><th>Ruta</th></tr></thead>';
+    var rowsHtml = rows.map(function(d){
+      var hora = new Date(d.created_at);
+      var horaStr = pad(hora.getHours())+':'+pad(hora.getMinutes());
+      return '<tr>'+
+        '<td>'+esc(horaStr)+'</td>'+
+        '<td>'+esc(ACCION_LABEL[d.accion]||d.accion||'Cargó')+'</td>'+
+        '<td>TT# '+esc(d.tt_codigo)+'</td>'+
+        '<td>'+(d.bl ? 'Bl '+esc(d.bl) : '—')+'</td>'+
+        '<td class="n">'+(d.cantidad != null ? esc(d.cantidad) : '—')+'</td>'+
+        '<td>'+esc(d.despachado_por||'—')+(d.despachado_por_rol ? ' <span class="rol-badge '+esc(d.despachado_por_rol)+'">'+esc(ROL_LABEL[d.despachado_por_rol]||d.despachado_por_rol)+'</span>' : '')+'</td>'+
+        '<td>'+esc(d.origen)+' &rarr; '+esc(d.destino)+'</td>'+
+      '</tr>';
+    }).join('');
+    table.innerHTML = thead + '<tbody>' + rowsHtml + '</tbody>';
+    el.appendChild(table);
+  }
+
+  async function buscarDespachos(){
+    var el = document.getElementById('listDespachos');
+    var fecha = document.getElementById('fDespachoFecha').value;
+    if(!fecha){ showToast('Elige una fecha.'); return; }
+    if(!supabaseConfigured || !supabaseClient){
+      el.className = 'empty-inline';
+      el.textContent = 'El historial de despachos solo está disponible con Supabase conectado.';
+      return;
+    }
+    el.className = 'empty-inline';
+    el.textContent = 'Buscando…';
+    var desde = fecha + 'T00:00:00';
+    var hasta = fecha + 'T23:59:59.999';
+    try{
+      var res = await supabaseClient.from('despachos')
+        .select('*')
+        .gte('created_at', desde)
+        .lte('created_at', hasta)
+        .order('created_at', {ascending: false});
+      if(res.error) throw res.error;
+      renderDespachos(res.data || []);
+    }catch(e){
+      console.error('Error consultando despachos:', e);
+      el.className = 'empty-inline';
+      el.textContent = 'No se pudo consultar el historial. Revisa que la tabla "despachos" exista en Supabase.';
+    }
+  }
+  document.getElementById('btnBuscarDespachos').addEventListener('click', buscarDespachos);
+
+  document.getElementById('btnRefreshAdministradorProg').addEventListener('click', function(){ onRecords(lastRecords, true); showToast('Actualizado.'); });
+
+  /* Pestañas internas de Administrador: Programar traslado / Programaciones */
+  var tabCapturarBtn = document.getElementById('tabCapturarBtn');
+  var tabProgramacionesBtn = document.getElementById('tabProgramacionesBtn');
+  var tabCapturarContent = document.getElementById('tabCapturarContent');
+  var tabProgramacionesContent = document.getElementById('tabProgramacionesContent');
+
+  function showAdminTab(tab){
+    var esCapturar = tab === 'capturar';
+    tabCapturarContent.style.display = esCapturar ? '' : 'none';
+    tabProgramacionesContent.style.display = esCapturar ? 'none' : '';
+    tabCapturarBtn.classList.toggle('active', esCapturar);
+    tabProgramacionesBtn.classList.toggle('active', !esCapturar);
+  }
+  tabCapturarBtn.addEventListener('click', function(){ showAdminTab('capturar'); });
+  tabProgramacionesBtn.addEventListener('click', function(){ showAdminTab('programaciones'); });
+  document.getElementById('btnRefreshVer').addEventListener('click', function(){ onRecords(lastRecords, true); showToast('Actualizado.'); });
+
+  /* ---------------------------------------------------------
+     Roles y sesión (Admin, Administrador, Operativo, Ver)
+  --------------------------------------------------------- */
+  var viewAdmin = document.getElementById('viewAdmin');
+  var viewOp = document.getElementById('viewOp');
+  var viewVer = document.getElementById('viewVer');
+  var viewGestion = document.getElementById('viewGestion');
+
+  var ROL_LABEL = {admin:'Admin', administrador:'Administrador', operativo:'Operativo', ver:'Ver'};
+
+  var SESSION_KEY = 'spb_session_v1';
+  var currentSession = null;
+
+  function loadSession(){
+    try{
+      var raw = sessionStorage.getItem(SESSION_KEY);
+      return raw ? JSON.parse(raw) : null;
+    }catch(e){ return null; }
+  }
+  function saveSession(s){
+    try{
+      if(s) sessionStorage.setItem(SESSION_KEY, JSON.stringify(s));
+      else sessionStorage.removeItem(SESSION_KEY);
+    }catch(e){}
+  }
+
+  function applyRole(rol){
+    viewAdmin.style.display = 'none';
+    viewOp.style.display = 'none';
+    viewVer.style.display = 'none';
+    viewGestion.style.display = 'none';
+
+    if(rol === 'administrador') viewAdmin.style.display = 'block';
+    else if(rol === 'operativo') viewOp.style.display = 'block';
+    else if(rol === 'ver') viewVer.style.display = 'block';
+    else viewGestion.style.display = 'block';
+  }
+
+  function hideAppLoading(){
+    var el = document.getElementById('appLoading');
+    if(el) el.style.display = 'none';
+    document.querySelector('main').classList.add('ready');
+  }
+
+  function showLoggedInUI(session){
+    currentSession = session;
+    saveSession(session);
+    document.getElementById('loginOverlay').style.display = 'none';
+    hideAppLoading();
+    var sessionInfo = document.getElementById('sessionInfo');
+    sessionInfo.style.display = 'flex';
+    document.getElementById('sessionLabel').innerHTML =
+      esc(session.nombre) + '<span class="rol-tag">'+esc(ROL_LABEL[session.rol]||session.rol)+'</span>';
+    applyRole(session.rol);
+
+    if(session.rol === 'admin' && typeof renderUsuariosList === 'function'){
+      renderUsuariosList(usuariosCache);
+    }
+
+    if(session.forcePasswordChange){
+      showToast('Por seguridad, debes crear tu propia contraseña.');
+      openChangePassword(true);
+    }
+  }
+
+  function showLoginOverlay(mode){
+    document.getElementById('sessionInfo').style.display = 'none';
+    viewAdmin.style.display = 'none';
+    viewOp.style.display = 'none';
+    viewVer.style.display = 'none';
+    viewGestion.style.display = 'none';
+    hideAppLoading();
+    document.getElementById('loginOverlay').style.display = 'flex';
+    document.getElementById('loginBootstrap').style.display = mode === 'bootstrap' ? 'block' : 'none';
+    document.getElementById('loginNormal').style.display = mode === 'bootstrap' ? 'none' : 'block';
+  }
+
+  function logout(){
+    currentSession = null;
+    saveSession(null);
+    showLoginOverlay('login');
+  }
+  document.getElementById('btnLogout').addEventListener('click', logout);
+
+  /* Menú desplegable de sesión (chip compacto en el header) */
+  (function(){
+    var sessionInfoEl = document.getElementById('sessionInfo');
+    var chipBtn = document.getElementById('sessionChipBtn');
+    chipBtn.addEventListener('click', function(e){
+      e.stopPropagation();
+      sessionInfoEl.classList.toggle('open');
+    });
+    document.addEventListener('click', function(e){
+      if(!sessionInfoEl.contains(e.target)) sessionInfoEl.classList.remove('open');
+    });
+    sessionInfoEl.querySelectorAll('.session-menu-item').forEach(function(item){
+      item.addEventListener('click', function(){ sessionInfoEl.classList.remove('open'); });
+    });
+  })();
+
+  /* ---------------------------------------------------------
+     Cambiar mi contraseña (con doble validación)
+  --------------------------------------------------------- */
+  var cpOverlay = document.getElementById('changePasswordOverlay');
+  var cpActual = document.getElementById('cpActual');
+  var cpNueva = document.getElementById('cpNueva');
+  var cpConfirmar = document.getElementById('cpConfirmar');
+  var cpError = document.getElementById('cpError');
+  var cpCancelBtn = document.getElementById('cpCancelBtn');
+  var cpForced = false;
+
+  var PASSWORD_RULE = /^(?=.*[A-Za-z])(?=.*[0-9]).{8,}$/;
+  var PASSWORD_RULE_MSG = 'La contraseña debe tener mínimo 8 caracteres, con letras y números.';
+
+  function openChangePassword(forced){
+    cpForced = !!forced;
+    cpActual.value = '';
+    cpNueva.value = '';
+    cpConfirmar.value = '';
+    cpError.style.display = 'none';
+    cpCancelBtn.style.display = cpForced ? 'none' : '';
+    cpOverlay.style.display = 'flex';
+    cpActual.focus();
+  }
+  function closeChangePassword(){
+    if(cpForced) return; /* obligatorio: no se puede cerrar sin cambiarla */
+    cpOverlay.style.display = 'none';
+  }
+
+  document.getElementById('btnCambiarPassword').addEventListener('click', function(){ openChangePassword(false); });
+  cpCancelBtn.addEventListener('click', closeChangePassword);
+  cpOverlay.addEventListener('click', function(e){ if(e.target === cpOverlay) closeChangePassword(); });
+
+  document.getElementById('cpGuardarBtn').addEventListener('click', async function(){
+    cpError.style.display = 'none';
+    if(!currentSession){ closeChangePassword(); return; }
+
+    var actual = cpActual.value;
+    var nueva = cpNueva.value.trim().toUpperCase();
+    var confirmar = cpConfirmar.value.trim().toUpperCase();
+
+    var yo = usuariosCache.find(function(u){ return u.id === currentSession.id; });
+    if(!yo){
+      cpError.textContent = 'No se pudo encontrar tu cuenta. Vuelve a iniciar sesión.';
+      cpError.style.display = 'block';
+      return;
+    }
+    if(!actual || normPwd(actual) !== normPwd(yo.password)){
+      cpError.textContent = 'La contraseña actual no es correcta.';
+      cpError.style.display = 'block';
+      return;
+    }
+    if(!nueva || !PASSWORD_RULE.test(nueva)){
+      cpError.textContent = PASSWORD_RULE_MSG;
+      cpError.style.display = 'block';
+      return;
+    }
+    if(nueva !== confirmar){
+      cpError.textContent = 'La nueva contraseña y su confirmación no coinciden.';
+      cpError.style.display = 'block';
+      return;
+    }
+    try{
+      await updateUsuario(currentSession.id, {password: nueva});
+      showToast('Tu contraseña se actualizó correctamente.');
+      cpForced = false;
+      closeChangePassword();
+    }catch(e){
+      cpError.textContent = 'No se pudo actualizar la contraseña. Intenta de nuevo.';
+      cpError.style.display = 'block';
+    }
+  });
+
+  document.getElementById('btnBootstrapCrear').addEventListener('click', async function(){
+    var nombre = document.getElementById('bsNombre').value.trim();
+    var usuario = document.getElementById('bsUsuario').value.trim();
+    var errEl = document.getElementById('bootstrapError');
+    errEl.style.display = 'none';
+    if(!nombre || !usuario){
+      errEl.textContent = 'Indica tu nombre y tu usuario.';
+      errEl.style.display = 'block';
+      return;
+    }
+    var nuevo = {nombre: nombre, usuario: usuario, password: '123456789', rol: 'admin', activo: true, createdAt: Date.now()};
+    try{
+      var newId = await createUsuario(nuevo);
+      showToast('Cuenta de Administrador creada. Contraseña inicial: 123456789.');
+      showLoggedInUI({id: newId, nombre: nombre, rol: 'admin', forcePasswordChange: true});
+    }catch(e){
+      errEl.textContent = 'No se pudo crear la cuenta. Intenta de nuevo.';
+      errEl.style.display = 'block';
+    }
+  });
+
+  document.getElementById('btnLoginEntrar').addEventListener('click', function(){
+    var usuario = document.getElementById('loginUsuario').value.trim();
+    var password = document.getElementById('loginPassword').value;
+    var errEl = document.getElementById('loginError');
+    errEl.style.display = 'none';
+    if(!usuario || !password){
+      errEl.textContent = 'Indica tu usuario y contraseña.';
+      errEl.style.display = 'block';
+      return;
+    }
+    var porUsuario = usuariosCache.find(function(u){
+      return (u.usuario||'').trim().toLowerCase() === usuario.toLowerCase();
+    });
+    var found = null;
+    if(!porUsuario){
+      errEl.textContent = usuariosCache.length ? 'Ese usuario no existe.' : 'No se pudieron cargar los usuarios. Revisa la conexión e intenta de nuevo.';
+    }else if(porUsuario.activo === false){
+      errEl.textContent = 'Esa cuenta está inactiva. Pídele al Admin que la active.';
+    }else if(normPwd(porUsuario.password) !== normPwd(password)){
+      errEl.textContent = 'La contraseña no es correcta.';
+    }else{
+      found = porUsuario;
+    }
+    if(!found){
+      errEl.style.display = 'block';
+      return;
+    }
+    showLoggedInUI({id: found.id, nombre: found.nombre, rol: found.rol, forcePasswordChange: (password.trim() === '123456789')});
+  });
+
+  ['bsNombre','bsUsuario'].forEach(function(id){
+    document.getElementById(id).addEventListener('keydown', function(e){
+      if(e.key === 'Enter'){ e.preventDefault(); document.getElementById('btnBootstrapCrear').click(); }
+    });
+  });
+  ['loginUsuario','loginPassword'].forEach(function(id){
+    document.getElementById(id).addEventListener('keydown', function(e){
+      if(e.key === 'Enter'){ e.preventDefault(); document.getElementById('btnLoginEntrar').click(); }
+    });
+  });
+
+  /* ---------------------------------------------------------
+     Gestión de usuarios (solo rol Admin)
+  --------------------------------------------------------- */
+  document.getElementById('gestionUsuariosToggle').addEventListener('click', function(){
+    document.getElementById('gestionUsuariosToggle').parentElement.classList.toggle('collapsed');
+  });
+
+  var usuariosCache = [];
+  var usuarioEditId = null;
+  var usuariosListEl = document.getElementById('usuariosList');
+  var uNombre = document.getElementById('uNombre');
+  var uUsuario = document.getElementById('uUsuario');
+  var uRol = document.getElementById('uRol');
+  var btnCrearUsuario = document.getElementById('btnCrearUsuario');
+  var fieldCancelarUsuario = document.getElementById('fieldCancelarUsuario');
+
+  function forceUpperCase(el){
+    el.addEventListener('input', function(){
+      var pos = el.selectionStart;
+      el.value = el.value.toUpperCase();
+      try{ el.setSelectionRange(pos, pos); }catch(e){}
+    });
+  }
+  forceUpperCase(uNombre);
+  forceUpperCase(uUsuario);
+  forceUpperCase(document.getElementById('bsNombre'));
+  forceUpperCase(document.getElementById('bsUsuario'));
+  forceUpperCase(document.getElementById('loginUsuario'));
+
+  /* Mayúscula sostenida en todo el formato: cualquier campo de texto o contraseña,
+     también los que se dibujan después (edición de ruta, etc.). */
+  document.addEventListener('input', function(e){
+    var el = e.target;
+    if(!el || (el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA')) return;
+    var t = (el.type || 'text').toLowerCase();
+    if(t !== 'text' && t !== 'password' && t !== 'search' && t !== 'textarea') return;
+    var up = el.value.toUpperCase();
+    if(up !== el.value){
+      var pos = el.selectionStart;
+      el.value = up;
+      try{ el.setSelectionRange(pos, pos); }catch(x){}
+    }
+  });
+
+  /* Las contraseñas también van en mayúscula: se comparan sin distinguir mayúsculas,
+     así las que se crearon antes en minúscula siguen funcionando. */
+  function normPwd(p){ return String(p == null ? '' : p).trim().toUpperCase(); }
+
+  function clearUsuarioEntry(){
+    uNombre.value = '';
+    uUsuario.value = '';
+    uRol.selectedIndex = 0;
+    uNombre.focus();
+  }
+
+  function startEditUsuario(u){
+    usuarioEditId = u.id;
+    uNombre.value = u.nombre;
+    uUsuario.value = u.usuario;
+    uRol.value = u.rol;
+    btnCrearUsuario.textContent = 'Guardar cambios';
+    fieldCancelarUsuario.style.display = '';
+  }
+
+  function cancelEditUsuario(){
+    usuarioEditId = null;
+    btnCrearUsuario.textContent = 'Crear';
+    fieldCancelarUsuario.style.display = 'none';
+    clearUsuarioEntry();
+  }
+  document.getElementById('btnCancelarUsuario').addEventListener('click', cancelEditUsuario);
+
+  btnCrearUsuario.addEventListener('click', async function(){
+    var nombre = uNombre.value.trim().toUpperCase();
+    var usuario = uUsuario.value.trim().toUpperCase();
+    var rol = uRol.value;
+    if(!nombre || !usuario){
+      showToast('Indica el nombre y el usuario.');
+      return;
+    }
+    var dup = usuariosCache.find(function(u){
+      return (u.usuario||'').toLowerCase() === usuario.toLowerCase() && u.id !== usuarioEditId;
+    });
+    if(dup){
+      showToast('Ese usuario ya existe ('+dup.nombre+').');
+      return;
+    }
+    try{
+      if(usuarioEditId){
+        await updateUsuario(usuarioEditId, {nombre: nombre, usuario: usuario, rol: rol});
+        showToast('Usuario actualizado.');
+        cancelEditUsuario();
+      }else{
+        await createUsuario({nombre: nombre, usuario: usuario, password: '123456789', rol: rol, activo: true, createdAt: Date.now()});
+        showToast('Usuario creado con contraseña por defecto 123456789.');
+        clearUsuarioEntry();
+      }
+    }catch(e){
+      showToast('No se pudo guardar el usuario.');
+    }
+  });
+
+  function renderUsuariosList(list){
+    var cntEl = document.getElementById('usuariosCount');
+    if(cntEl) cntEl.textContent = (list || []).length;
+    usuariosListEl.innerHTML = '';
+    if(!list.length){
+      var empty = document.createElement('div');
+      empty.className = 'empty-inline';
+      empty.textContent = 'Aún no hay usuarios.';
+      usuariosListEl.appendChild(empty);
+      return;
+    }
+    list.forEach(function(u){
+      var item = document.createElement('div');
+      item.className = 'usuario-item';
+      var estaActivo = u.activo !== false;
+      item.innerHTML =
+        '<div class="info"><b>'+esc(u.nombre)+'</b> &middot; usuario: '+esc(u.usuario)+
+        '<span class="rol-badge '+esc(u.rol)+'">'+esc(ROL_LABEL[u.rol]||u.rol)+'</span>'+
+        (!estaActivo ? '<span class="rol-badge" style="background:#f2f2f2;color:#666;">Inactivo</span>' : '')+
+        '</div>'+
+        '<div style="display:flex;gap:6px;">'+
+          '<button type="button" class="icon-btn btn-toggle-usuario" title="'+(estaActivo ? 'Desactivar' : 'Activar')+'" style="color:'+(estaActivo ? '#8a6100' : '#1f7a45')+';">'+(estaActivo ? '&#9208;' : '&#9654;')+'</button>'+
+          '<button type="button" class="icon-btn btn-edit-usuario" title="Editar" style="color:var(--spb-blue);">&#9998;</button>'+
+          '<button type="button" class="icon-btn btn-rm-usuario" title="Eliminar">&times;</button>'+
+        '</div>';
+      item.querySelector('.btn-edit-usuario').addEventListener('click', function(){ startEditUsuario(u); });
+      item.querySelector('.btn-toggle-usuario').addEventListener('click', async function(){
+        var accion = estaActivo ? 'desactivar' : 'activar';
+        var ok = await customConfirm('¿Deseas '+accion+' la cuenta de '+u.nombre+'?');
+        if(!ok) return;
+        try{
+          await updateUsuario(u.id, {activo: !estaActivo});
+          showToast('Usuario '+(estaActivo ? 'desactivado' : 'activado')+'.');
+        }catch(e){ showToast('No se pudo actualizar el usuario.'); }
+      });
+      item.querySelector('.btn-rm-usuario').addEventListener('click', async function(){
+        var ok = await customConfirm('¿Eliminar la cuenta de '+u.nombre+'?');
+        if(!ok) return;
+        try{ await deleteUsuario(u.id); showToast('Usuario eliminado.'); }
+        catch(e){ showToast('No se pudo eliminar el usuario.'); }
+      });
+      usuariosListEl.appendChild(item);
+    });
+  }
+
+  var authStarted = false;
+  function handleUsuariosSnapshot(list){
+    usuariosCache = list;
+    if(currentSession && currentSession.rol === 'admin'){
+      renderUsuariosList(list);
+    }
+    if(!authStarted){
+      authStarted = true;
+      var session = loadSession();
+      if(session && list.some(function(u){ return u.id === session.id && u.activo !== false; })){
+        var yoActual = list.find(function(u){ return u.id === session.id; });
+        session.forcePasswordChange = !!(yoActual && yoActual.password === '123456789');
+        showLoggedInUI(session);
+      }else if(!list.length){
+        showLoginOverlay('bootstrap');
+      }else{
+        showLoginOverlay('login');
+      }
+    }
+  }
+
+  /* ---------------------------------------------------------
+     Arranque
+  --------------------------------------------------------- */
+  renderTTProgramados();
+  renderItemsProgramados();
+  document.getElementById('fFecha').value = todayISO();
+
+  initDb().then(function(){
+    subscribeRecords(onRecords);
+    subscribeUsuarios(handleUsuariosSnapshot);
+  });
+
+})();
+</script>
+
+<script>
+/* Botón "Instalar app": Chrome/Edge/Android avisan cuando la PWA
+   es instalable; guardamos ese aviso y lo disparamos con el botón. */
+(function(){
+  var deferredPrompt = null;
+  var btn = document.getElementById('btnInstalarApp');
+
+  window.addEventListener('beforeinstallprompt', function(e){
+    e.preventDefault();
+    deferredPrompt = e;
+    btn.style.display = '';
+  });
+
+  btn.addEventListener('click', async function(){
+    if(!deferredPrompt) return;
+    btn.style.display = 'none';
+    deferredPrompt.prompt();
+    await deferredPrompt.userChoice;
+    deferredPrompt = null;
+  });
+
+  window.addEventListener('appinstalled', function(){
+    btn.style.display = 'none';
+    deferredPrompt = null;
+  });
+})();
+</script>
+
+<script>
+/* =========================================================
+   Registro del Service Worker (PWA instalable + auto-actualización)
+   ---------------------------------------------------------
+   Solo funciona cuando el archivo se abre por https:// (o
+   localhost), sirviendo index.html, manifest.json y
+   service-worker.js desde la misma carpeta. Si lo abres
+   directo desde tu computador (file://) esta parte se omite
+   sola y la app sigue funcionando igual, solo que sin modo
+   instalable ni uso sin internet.
+========================================================= */
+(function(){
+  if(!('serviceWorker' in navigator)) return;
+  if(location.protocol !== 'https:' && location.hostname !== 'localhost') return;
+
+  var reloading = false;
+
+  navigator.serviceWorker.addEventListener('controllerchange', function(){
+    if(reloading) return;
+    reloading = true;
+    window.location.reload();
+  });
+
+  navigator.serviceWorker.register('service-worker.js').then(function(reg){
+    reg.addEventListener('updatefound', function(){
+      var nuevo = reg.installing;
+      if(!nuevo) return;
+      nuevo.addEventListener('statechange', function(){
+        if(nuevo.state === 'installed' && navigator.serviceWorker.controller){
+          /* Hay una versión nueva lista: la activamos de una vez.
+             El listener de 'controllerchange' de arriba recarga la página sola. */
+          nuevo.postMessage({type: 'SKIP_WAITING'});
+        }
+      });
+    });
+  }).catch(function(err){
+    console.warn('No se pudo registrar el service worker:', err);
+  });
+})();
+</script>
+</body>
+</html>
