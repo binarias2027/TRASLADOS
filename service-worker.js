@@ -18,7 +18,7 @@
       vez que Claude (o quien edite el código) guarda un cambio
       en index.html o en este archivo.
 ========================================================= */
-const CACHE_VERSION = 'v20260920-4';
+const CACHE_VERSION = 'v20260920-6';
 const CACHE_NAME = 'spb-traslado-' + CACHE_VERSION;
 
 const PRECACHE_URLS = [
