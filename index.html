@@ -2417,7 +2417,20 @@
     var res = await supabaseClient.functions.invoke('enviar-correo-cargue', {
       body: {to: to, subject: subject, text: text}
     });
-    if(res.error) throw res.error;
+    if(res.error){
+      /* Traemos el mensaje real que devolvió la función (Resend/Supabase) */
+      var detalle = '';
+      try{
+        if(res.error.context && typeof res.error.context.json === 'function'){
+          var j = await res.error.context.json();
+          var er = j && j.error;
+          detalle = typeof er === 'string' ? er : (er && (er.message || JSON.stringify(er))) || '';
+        }
+      }catch(_){}
+      var err = new Error(detalle || res.error.message || 'Error al llamar la función');
+      err.detalle = detalle;
+      throw err;
+    }
     return res.data;
   }
 
@@ -2493,7 +2506,7 @@
       console.error('No se pudo enviar el correo:', e);
       delete correosEnviando[key];
       flashCorreo(correosErr, key);
-      showToast('No se pudo enviar el correo. Revisa que la función de Resend esté publicada.');
+      showToast('No se pudo enviar el correo: '+String(e && e.message || 'error desconocido').slice(0,140));
       return;
     }
 
