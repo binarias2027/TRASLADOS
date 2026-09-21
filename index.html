@@ -1736,16 +1736,35 @@
 
   function renderItemsProgramados(){
     scheduleAutoSync();
-    document.getElementById('itemsProgramadosCount').textContent = itemsProgramados.length;
+    paintItemsProgramados();
+  }
+
+  function paintItemsProgramados(){
+    var recActual = (typeof lastRecords !== 'undefined' && lastRecords && currentRecordId)
+      ? lastRecords.find(function(r){ return r.id === currentRecordId; })
+      : null;
+    function estaCompleto(it){
+      if(!recActual) return false;
+      var real = (recActual.items||[]).find(function(i){ return i.bl === it.bl; });
+      if(!real) return false;
+      var restante = real.restante != null ? Number(real.restante) : Number(real.cantidad);
+      return restante <= 0;
+    }
+    var pendientes = itemsProgramados.filter(function(it){ return !estaCompleto(it); });
+
+    document.getElementById('itemsProgramadosCount').textContent = pendientes.length;
     itemsProgramadosListEl.innerHTML = '';
-    if(!itemsProgramados.length){
+    if(!pendientes.length){
       var empty = document.createElement('div');
       empty.className = 'empty-inline';
-      empty.textContent = 'Aún no has programado ningún BL.';
+      empty.textContent = itemsProgramados.length
+        ? 'Todos los BL de esta programación ya se completaron.'
+        : 'Aún no has programado ningún BL.';
       itemsProgramadosListEl.appendChild(empty);
       return;
     }
-    itemsProgramados.forEach(function(it, idx){
+    pendientes.forEach(function(it){
+      var idx = itemsProgramados.indexOf(it);
       var el = document.createElement('div');
       el.className = 'tt-programado-item';
       if(idx === itemEditIndex) el.style.borderColor = 'var(--spb-blue)';
@@ -2978,6 +2997,7 @@
     lastRecordsSig = sig;
     lastRecords = records;
     hydrateAdminFromCurrent(records);
+    if(typeof paintItemsProgramados === 'function') paintItemsProgramados();
     var saved = captureCargaState();
     renderList(listOpEl, records, {deletable:false, editableStatus:true});
     renderList(listVerEl, records, {deletable:false, editableStatus:false});
