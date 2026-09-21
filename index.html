@@ -599,6 +599,8 @@
   .cargue-actions{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;}
   @media (max-width:480px){.cargue-actions .btn{flex:1;}}
   .carga-lineas div{font-size:13.5px;}
+  .carga-linea-bl{display:flex;align-items:center;justify-content:space-between;gap:8px;}
+  .carga-linea-bl .icon-btn{width:20px;height:20px;font-size:13px;flex-shrink:0;}
   .carga-pick-label,.carga-bls-hint{font-size:12px;color:var(--ink-soft);margin:2px 0 6px;}
   .carga-tt-pick select{width:100%;}
   .carga-bls{margin:8px 0 4px;}
@@ -2669,6 +2671,38 @@
     if(ok2) logLineas(r, ttCodigo, t0, 'reversar', lineasLog);
   }
 
+  async function reversarLinea(r, ttCodigo, bl){
+    var t0 = findTT(r, ttCodigo);
+    var lineas0 = t0 ? ttLineas(t0) : [];
+    var linea0 = lineas0.find(function(l){ return l.bl === bl; });
+    var detalle = linea0 ? '\n\nBl '+linea0.bl+' - Cant. '+linea0.cantidad+'\n\nEsa cantidad vuelve al BL.' : '';
+    var ok = await customConfirm('¿Reversar el Bl '+bl+' del TT# '+ttCodigo+'?'+detalle);
+    if(!ok) return;
+    var quienNombre = currentSession ? currentSession.nombre : null;
+    var lineasLog = [];
+    var ok2 = await mutateRecord(r.id, function(cur){
+      var tt = findTT(cur, ttCodigo);
+      if(!tt) return {error: 'El TT# '+ttCodigo+' ya no está en esta programación.'};
+      if(tt.estado !== 'cargado') return {error: 'El TT# '+ttCodigo+' ya no está cargado (alguien más lo actualizó).'};
+      var lineas = ttLineas(tt);
+      var quitada = lineas.filter(function(l){ return l.bl === bl; });
+      if(!quitada.length) return {error: 'Ese Bl ya no está cargado en el TT# '+ttCodigo+'.'};
+      lineasLog = quitada;
+      var quedan = lineas.filter(function(l){ return l.bl !== bl; });
+      var nuevo = quedan.length
+        ? ttNuevo(tt, 'cargado', quedan, quienNombre, 'Reversado')
+        : ttNuevo(tt, 'libre', [], quienNombre, 'Reversado');
+      return {
+        fields: {
+          tts: reemplazarTT(cur, ttCodigo, nuevo),
+          items: devolverAItems(cur.items, quitada)
+        },
+        message: 'Bl '+bl+' reversado del TT# '+ttCodigo+'. La cantidad volvió al BL.'
+      };
+    });
+    if(ok2) logLineas(r, ttCodigo, t0, 'reversar', lineasLog);
+  }
+
   async function liberarCarga(r, ttCodigo){
     var t0 = findTT(r, ttCodigo);
     var lineas0 = t0 ? ttLineas(t0) : [];
@@ -2978,7 +3012,9 @@
       var cargasHtml = '<div class="tt-title"><span>Cargas<span class="tt-count">'+ttsCargados.length+'</span></span></div>';
       ttsCargados.forEach(function(tt){
         var lineasHtml = ttLineas(tt).map(function(l){
-          return '<div>Bl '+esc(l.bl)+' - Cant. '+esc(l.cantidad)+'</div>';
+          return '<div class="carga-linea-bl" data-bl="'+esc(l.bl)+'"><span>Bl '+esc(l.bl)+' - Cant. '+esc(l.cantidad)+'</span>'+
+            (opts.editableStatus ? '<button type="button" class="icon-btn btn-reversar-linea" title="Reversar solo este Bl">&times;</button>' : '')+
+          '</div>';
         }).join('');
         cargasHtml += '<div class="tt-programado-item" data-tt="'+esc(tt.codigo)+'">'+
           '<div class="info carga-lineas"><b>TT# '+esc(tt.codigo)+'</b>'+lineasHtml+
@@ -3016,6 +3052,11 @@
         cargasDiv.querySelectorAll('.btn-reversar').forEach(function(btn){
           var codigo = btn.closest('.tt-programado-item').dataset.tt;
           btn.addEventListener('click', function(){ reversarCarga(r, codigo); });
+        });
+        cargasDiv.querySelectorAll('.btn-reversar-linea').forEach(function(btn){
+          var codigo = btn.closest('.tt-programado-item').dataset.tt;
+          var bl = btn.closest('.carga-linea-bl').dataset.bl;
+          btn.addEventListener('click', function(e){ e.stopPropagation(); reversarLinea(r, codigo, bl); });
         });
         cargasDiv.querySelectorAll('.btn-liberar-carga').forEach(function(btn){
           var codigo = btn.closest('.tt-programado-item').dataset.tt;
