@@ -786,6 +786,14 @@
     border:2px solid currentColor;border-top-color:transparent;
     animation:spin .7s linear infinite;
   }
+  .flag-correo{
+    display:inline-flex;align-items:center;gap:5px;margin-top:5px;padding:2px 9px 2px 7px;
+    border-radius:999px;background:#e6f4ea;color:#1e7a34;border:1px solid #a5d6b1;
+    font-size:11.5px;font-weight:700;letter-spacing:.2px;
+  }
+  .flag-correo svg{width:12px;height:12px;flex-shrink:0;}
+  .flag-correo.nuevo{animation:flagPop .45s ease-out;}
+  @keyframes flagPop{0%{transform:scale(.6);opacity:0;}70%{transform:scale(1.08);}100%{transform:scale(1);opacity:1;}}
   .btn-correo-carga.ok{background:#2e7d32;color:#fff;}
   .btn-correo-carga.ok .correo-count{background:#fff;color:#2e7d32;}
   .btn-correo-carga.err{background:#c0392b;color:#fff;}
@@ -2523,6 +2531,9 @@
     delete correosEnviando[key];
     if(nuevoConteo != null){
       correoBtnsDe(key).forEach(function(b){ b.querySelector('.correo-count').textContent = nuevoConteo; });
+      Array.prototype.forEach.call(document.querySelectorAll('.flag-correo'), function(f){
+        if(f.dataset.key === key){ f.style.display = ''; f.classList.remove('nuevo'); void f.offsetWidth; f.classList.add('nuevo'); }
+      });
     }
     flashCorreo(correosOk, key);
   }
@@ -2972,6 +2983,9 @@
         cargasHtml += '<div class="tt-programado-item" data-tt="'+esc(tt.codigo)+'">'+
           '<div class="info carga-lineas"><b>TT# '+esc(tt.codigo)+'</b>'+lineasHtml+
           (tt.ultimoPor ? '<div class="tt-op-meta">Cargado por <b>'+esc(tt.ultimoPor)+'</b></div>' : '')+
+          '<div class="flag-correo" data-key="'+esc(r.id+'|'+tt.codigo)+'"'+(Number(tt.correos||0) > 0 ? '' : ' style="display:none;"')+'>'+
+            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>'+
+            'Correo enviado</div>'+
           '</div>'+
           (opts.editableStatus ?
             '<div class="carga-actions">'+
