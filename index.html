@@ -1592,6 +1592,8 @@
     var merged = Object.assign({}, cur, out.fields);
     var estado = calcEstado(merged);
     out.fields.estado = estado;
+    merged.estado = estado;
+    merged.id = id;
 
     /* Ya se recogió todo (todos los BL en 0) y ningún TT quedó cargado:
        se cierra sola, como si le hubieran dado "Finalizar traslado". */
@@ -1608,7 +1610,10 @@
     }
 
     try{
-      await updateRecordFields(id, out.fields);
+      /* Usamos lo que ya leímos arriba y lo escribimos de una vez (set),
+         en vez de update() -que internamente vuelve a leer antes de escribir-.
+         Así cada acción hace 2 viajes al servidor en vez de 3. */
+      await saveRecord(merged);
     }catch(e){
       showToast('No se pudo guardar el cambio. Intenta de nuevo.');
       return false;
