@@ -21,11 +21,6 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-<!-- Cliente de Supabase (JS). Este archivo está pensado para alojarse
-     FUERA de Claude (tu propio hosting, Netlify, Vercel, GitHub Pages,
-     o simplemente abriéndolo en tu navegador). Dentro de Claude esta
-     conexión no funcionará por las restricciones de seguridad de la
-     plataforma. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
   :root{
@@ -48,7 +43,6 @@
     --radius:12px;
     --shadow:0 1px 2px rgba(16,40,64,.06), 0 8px 24px rgba(16,40,64,.07);
   }
-  /* Fondo siempre blanco: no se sigue el modo oscuro del dispositivo/navegador */
   html, body{background:#ffffff !important;}
 
   *{box-sizing:border-box;}
@@ -115,7 +109,6 @@
     header.topbar .status-pill .label-text{display:none;}
   }
 
-  /* Sesión: chip compacto + menú desplegable (en vez de botones grandes) */
   .session-info{position:relative;}
   .session-chip{
     display:flex;
@@ -232,7 +225,6 @@
     color:var(--ink-soft);
   }
 
-  /* Tarjetas profesionales por categoría (mismo lenguaje visual en todo el HTML) */
   .card-sec{
     --acc:#003d7a; --acc-line:#c4d3e3;
     border-left:5px solid var(--acc);
@@ -522,7 +514,6 @@
   .rec-tt table td{padding:2px 6px;font-size:12.8px;}
   .rec-tt table td.n{color:var(--ink-soft);}
 
-  /* Tarjeta de sección: misma estructura para TT, BL, Cargar y Cargas */
   .rec-tt.rec-sec{
     --acc:#005aab; --acc-bg:#f3f8fd; --acc-line:#b9d3ec;
     border:1.5px solid var(--acc-line);
@@ -818,9 +809,6 @@
   ::-webkit-scrollbar{width:9px;height:9px;}
   ::-webkit-scrollbar-thumb{background:var(--line);border-radius:6px;}
 
-  /* =========================================================
-     Ajustes para que se sienta como una app nativa en celular
-  ========================================================= */
   @media (max-width:600px){
     main{padding:14px 10px 90px;}
     .panel{padding:16px 14px;border-radius:0;margin-bottom:14px;margin-left:-10px;margin-right:-10px;}
@@ -829,8 +817,6 @@
     .card-sec{border-left-width:4px;}
     .card-sec > h2, .card-sec > h3.card-title{font-size:12.5px;margin-bottom:12px;padding-bottom:8px;}
 
-    /* Quitamos los bordes de las tarjetas en celular: se apoyan solo en
-       fondo + sombra suave, así se ven más limpias y ocupan mejor el ancho. */
     .panel{border:none;}
     .rec-card{border:none;}
     .tt-programado-item, .usuario-item{border:none;}
@@ -842,21 +828,17 @@
     .cargue-item,
     .carga-bl-row{border:none;}
 
-    /* Pestañas (Programar traslado / Programaciones, Administrador / Operativo / Ver) */
     .role-switch{width:100%;padding:2px;}
     .role-switch button{padding:10px 8px;font-size:12.5px;}
 
-    /* Botón Actualizar y acciones de encabezado de tarjeta */
     .tabs-actions{margin-bottom:8px;}
     .tabs-actions .btn{padding:7px 12px;font-size:12px;}
 
-    /* Filas de TT/BL programados: menos aire, texto más contenido */
     .tt-programado-item, .usuario-item{padding:10px 12px;}
     .tt-op-row{padding:5px 0;}
     .rec-tt{padding:10px 12px 6px;}
     .rec-tt .tt-title{font-size:11.5px;}
 
-    /* Formularios: campos con menos relleno lateral */
     input[type=text],input[type=date],input[type=number],input[type=password],select,textarea{
       padding:9px 10px;
       font-size:13.5px;
@@ -864,11 +846,9 @@
     label{font-size:11px;}
     .field{margin-bottom:10px;}
 
-    /* Botones de acción no deben forzar scroll horizontal */
     .btn{padding:9px 14px;font-size:13px;}
     .btn-row{gap:8px;}
 
-    /* Tarjeta de "Cargar": que los campos no se corten */
     .carga-row{gap:6px;}
     .carga-row select,.carga-row input{font-size:12.5px;padding:8px 8px;}
 
@@ -1237,24 +1217,6 @@
 <script>
 (function(){
 
-  /* =========================================================
-     CONFIGURACIÓN DE SUPABASE
-     -------------------------------------------------------
-     1) Crea un proyecto gratis en https://supabase.com
-     2) Ve a Project Settings > API y copia:
-          - "Project URL"          -> pégala en SUPABASE_URL
-          - "anon public" API key  -> pégala en SUPABASE_ANON_KEY
-     3) Ve a "SQL Editor" en Supabase y ejecuta el script SQL que
-        viene en el archivo supabase_setup.sql (te lo entregué aparte).
-        Eso crea las tablas "programaciones" y "usuarios" y activa
-        la sincronización en tiempo real (Realtime).
-     4) Guarda este archivo y ábrelo en tu navegador, o súbelo a tu
-        hosting (Netlify, Vercel, GitHub Pages, tu propio servidor).
-
-     Mientras dejes los valores de ejemplo de abajo, la app funciona
-     igual que antes (guardando solo en este navegador) para que
-     puedas probar la interfaz sin tener Supabase listo todavía.
-  ========================================================= */
   var SUPABASE_URL = 'https://glzhwoswyditummgfbin.supabase.co';
   var SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imdsemh3b3N3eWRpdHVtbWdmYmluIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk3NDQyMzIsImV4cCI6MjEwNTMyMDIzMn0.ZY5bVbeahJ2mGXjWwN4IcofoyEvztHMIg1jR3tZ4Hug';
 
@@ -1272,9 +1234,6 @@
   }
 
 
-  /* ---------------------------------------------------------
-     Utilidades
-  --------------------------------------------------------- */
   function uid(prefix){
     return prefix + '_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2,7);
   }
@@ -1302,9 +1261,6 @@
     t._h = setTimeout(function(){ t.classList.remove('show'); }, 2600);
   }
 
-  /* Reemplazo de window.confirm(): algunos navegadores bloquean los
-     diálogos nativos dentro de esta ventana, así que usamos un
-     cuadro de confirmación propio. Devuelve una Promise<boolean>. */
   function customConfirm(message){
     return new Promise(function(resolve){
       var overlay = document.getElementById('confirmOverlay');
@@ -1329,9 +1285,6 @@
     });
   }
 
-  /* Como customConfirm, pero con varias opciones para elegir
-     (por ejemplo: "Reversar", "Liberar" o "Cancelar").
-     Devuelve la "key" de la opción elegida, o null si se cancela. */
   function customChoice(message, choices){
     return new Promise(function(resolve){
       var overlay = document.getElementById('confirmOverlay');
@@ -1372,12 +1325,6 @@
     });
   }
 
-  /* ---------------------------------------------------------
-     Capa de datos: intenta usar la capacidad "db" de Claude
-     (sincroniza entre Administrador y Operativo en cualquier
-     dispositivo). Si no está disponible, usa localStorage
-     como respaldo local para poder probar el formulario.
-  --------------------------------------------------------- */
   var db = null;
   var dbReady = false;
   var LOCAL_KEY = 'spb_programaciones_local_v1';
@@ -1406,13 +1353,6 @@
     };
   }
 
-  /* =========================================================
-     Adaptador de Supabase: imita exactamente la misma forma
-     (doc().set/update/delete, collection().add/onSnapshot, etc.)
-     que usa el resto de la app, para no tener que tocar nada más.
-     Cada tabla en Supabase tiene columnas: id (text), data (jsonb),
-     updated_at (timestamptz). Todo el contenido va dentro de "data".
-  ========================================================= */
   function newLocalId(){
     return 'id_' + Date.now().toString(36) + '_' + Math.random().toString(36).slice(2, 8);
   }
@@ -1438,8 +1378,6 @@
           var merged = Object.assign({}, cur.data ? cur.data.data : {}, fields, {id: id});
           var res = await client.from(table).update({data: merged, updated_at: new Date().toISOString()}).eq('id', id).select('id');
           if(res.error) throw res.error;
-          /* Con RLS activo y sin política de UPDATE, Supabase responde "ok" pero no cambia nada.
-             Se trata como error para no mostrar "se actualizó" cuando no se guardó. */
           if(!res.data || !res.data.length){
             throw new Error('No se actualizó ninguna fila en "'+table+'" (revisa las políticas RLS de UPDATE).');
           }
@@ -1462,7 +1400,7 @@
           if(res.error) throw res.error;
           return {id: id};
         },
-        orderBy: function(){ return ref; }, /* se ordena por fecha de actualización, ver nota abajo */
+        orderBy: function(){ return ref; },
         limit: function(n){ limitN = n; return ref; },
         onSnapshot: function(next, onError){
           var closed = false;
@@ -1472,7 +1410,6 @@
             var q = client.from(table).select('id,data').order('updated_at', {ascending: false});
             if(limitN) q = q.limit(limitN);
             q.then(function(res){
-              /* ignora respuestas viejas que lleguen después de una más nueva */
               if(closed || mySeq < lastApplied) return;
               lastApplied = mySeq;
               if(res.error){
@@ -1483,7 +1420,7 @@
                 return {id: row.id, exists: true, data: function(){ return row.data; }};
               });
               next({docs: docs, size: docs.length, empty: docs.length === 0});
-            }, function(){ /* sin red: se reintenta con el próximo evento o el sondeo */ });
+            }, function(){ });
           }
           fetchAndEmit();
           var channel = client.channel(table + '-changes-' + Math.random().toString(36).slice(2))
@@ -1491,15 +1428,13 @@
             .subscribe(function(status){
               if(closed) return;
               if(status === 'SUBSCRIBED'){
-                fetchAndEmit(); /* cubre lo que pasó mientras se conectaba */
+                fetchAndEmit();
                 setSyncStatus(true);
               }else if(status === 'CHANNEL_ERROR' || status === 'TIMED_OUT' || status === 'CLOSED'){
                 setSyncStatus(false);
               }
             });
 
-          /* Red de seguridad: si el celular estuvo en segundo plano o se cayó el
-             websocket, al volver se re-consulta todo y además hay un sondeo suave. */
           function onVisible(){ if(!document.hidden) fetchAndEmit(); }
           function onOnline(){ fetchAndEmit(); }
           document.addEventListener('visibilitychange', onVisible);
@@ -1602,10 +1537,6 @@
     }
   }
 
-  /* Estado automático según los movimientos de la mercancía:
-     - pendiente: no ha habido ningún movimiento
-     - programado: hay movimientos (algún TT cargado o cantidad ya tomada de un BL)
-     - atendido: toda la carga ya se despachó (todos los BL en cero y ningún TT cargado) */
   function calcEstado(r){
     var items = r.items || [], tts = r.tts || [];
     var hayCargado = tts.some(function(t){ return t.estado === 'cargado' || t.estado === 'cargando'; });
@@ -1621,7 +1552,6 @@
     return todoDespachado ? 'atendido' : 'programado';
   }
 
-  /* Una programación vence a las 23:59 del día de su fecha (hora local) */
   function isExpired(r){
     var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(r.fecha || '');
     var y, mo, d;
@@ -1633,8 +1563,6 @@
     return Date.now() >= new Date(y, mo - 1, d, 23, 59, 0, 0).getTime();
   }
 
-  /* Lee la programación tal como está AHORA en la base (no la copia que quedó
-     pintada en pantalla), para no pisar cambios que hizo otro rol un segundo antes. */
   async function getRecordFresh(id){
     if(db){
       var snap = await db.collection('programaciones').doc(id).get();
@@ -1648,7 +1576,6 @@
     return localGetAll().find(function(r){ return r.id === id; }) || null;
   }
 
-  /* fn(actual) devuelve {error:'...'} o {fields:{...}, message:'...'} */
   async function mutateRecord(id, fn){
     var cur = null, leyo = true;
     try{ cur = await getRecordFresh(id); }
@@ -1686,9 +1613,6 @@
     }
   }
 
-  /* ---------------------------------------------------------
-     Usuarios y roles (Admin, Administrador, Operativo, Ver)
-  --------------------------------------------------------- */
   var LOCAL_USERS_KEY = 'spb_usuarios_local_v1';
 
   function localUsersGetAll(){
@@ -1765,11 +1689,6 @@
     }
   }
 
-  /* ---------------------------------------------------------
-     Formulario: Vehículos (TT) y BL/Cantidad son independientes.
-     Varios TT comparten una sola lista de BL: cualquier TT puede
-     recoger cualquiera de los BL/cantidades registrados.
-  --------------------------------------------------------- */
   var ttProgramados = [];
   var ttEditIndex = null;
   var ttProgramadosListEl = document.getElementById('ttProgramadosList');
@@ -1779,7 +1698,6 @@
   var btnProgramarTT = document.getElementById('btnProgramarTT');
   var fieldCancelarTT = document.getElementById('fieldCancelarTT');
 
-  /* Solo dígitos, y el TT # limitado a 3 caracteres */
   fTTCodigo.addEventListener('input', function(){
     fTTCodigo.value = fTTCodigo.value.replace(/\D/g, '').slice(0, 3);
   });
@@ -1790,7 +1708,6 @@
     fTTOperador.value = fTTOperador.value.replace(/[^A-Za-zÁÉÍÓÚÑÜáéíóúñü ]/g, '');
   });
 
-  /* ---- BL y cantidad: misma estructura que Vehículos (TT) ---- */
   var itemsProgramados = [];
   var itemEditIndex = null;
   var itemsProgramadosListEl = document.getElementById('itemsProgramadosList');
@@ -1993,13 +1910,7 @@
     renderItemsProgramados();
   }
 
-  /* FINALIZAR TRASLADO: limpia TODO lo que haya en la pantalla de programaciones,
-     aunque esté "huérfano" (por ejemplo BL que quedaron sin TT) y aunque no sea la
-     programación que este administrador tiene abierta en el formulario.
-     Si hay TT, pregunta si se dejan libres o se quitan. Lo que ya se cargó y confirmó
-     queda en el historial. */
   document.getElementById('btnFinalizarTraslado').addEventListener('click', async function(){
-    /* 1) Juntar todo lo que hay en pantalla y releerlo tal como está AHORA en la base */
     var base = {};
     (typeof rawRecords !== 'undefined' && rawRecords ? rawRecords : []).forEach(function(r){ base[r.id] = r; });
     (typeof lastRecords !== 'undefined' && lastRecords ? lastRecords : []).forEach(function(r){ if(!base[r.id]) base[r.id] = r; });
@@ -2010,7 +1921,7 @@
     for(var i = 0; i < ids.length; i++){
       var fr = null, leyo = true;
       try{ fr = await getRecordFresh(ids[i]); }catch(e){ leyo = false; }
-      if(!fr && !leyo && base[ids[i]].origen !== undefined) fr = base[ids[i]]; /* sin conexión: usa la copia */
+      if(!fr && !leyo && base[ids[i]].origen !== undefined) fr = base[ids[i]];
       if(fr){ if(!fr.id) fr.id = ids[i]; recs.push(fr); }
     }
 
@@ -2024,13 +1935,12 @@
       return;
     }
 
-    /* 2) Resumen de lo que se va a limpiar */
     function faltanTexto(r){
       var partes = [];
       (r.items||[]).forEach(function(it){
         var falta = it.restante != null ? Number(it.restante) : Number(it.cantidad);
         (r.tts||[]).forEach(function(t){
-          if(t.estado === 'cargando'){ /* lo reservado a medias nunca se confirmó: vuelve a "faltan" */
+          if(t.estado === 'cargando'){
             ttLineas(t).forEach(function(l){ if(l.bl === it.bl) falta += Number(l.cantidad || 0); });
           }
         });
@@ -2066,7 +1976,6 @@
       if(!okFin) return;
     }
 
-    /* 3) Se relee justo antes de borrar, por si Operativo confirmó algo mientras se decidía */
     var fallos = 0;
     for(var k = 0; k < recs.length; k++){
       var rec = recs[k];
@@ -2077,7 +1986,6 @@
         fallos++;
         continue;
       }
-      /* Queda en el historial qué se hizo con cada TT */
       (rec.tts||[]).forEach(function(t){
         var base0 = {programacion_id: rec.id, origen: rec.origen, destino: rec.destino,
                      tt_codigo: t.codigo, tt_operador: t.operador, tt_cc: t.cc};
@@ -2203,9 +2111,8 @@
     }
 
     var errs = validate(data);
-    if(errs.length) return; /* aún incompleto: no se sincroniza todavía */
+    if(errs.length) return;
 
-    /* Estado real en la base (incluye lo que acaba de hacer Operativo) */
     var existing = null;
     if(currentRecordId){
       try{ existing = await getRecordFresh(currentRecordId); }catch(e){ existing = null; }
@@ -2227,8 +2134,6 @@
       };
     });
 
-    /* Si Administrativo quita un TT que estaba cargado (o con un cargue en curso),
-       lo que tenía asignado vuelve al BL */
     var removedLines = [];
     (existing && existing.tts ? existing.tts : []).forEach(function(o){
       if(o.estado !== 'libre' && !data.tts.some(function(t){ return t.codigo === o.codigo; })){
@@ -2240,7 +2145,6 @@
       var old = existing && existing.items ? existing.items.find(function(o){ return o.bl === it.bl; }) : null;
       var restante = Number(it.cantidad);
       if(old){
-        /* conserva lo ya cargado/liberado; si cambió la cantidad, ajusta la diferencia */
         var oldRest = old.restante != null ? Number(old.restante) : Number(old.cantidad);
         restante = oldRest + (Number(it.cantidad) - Number(old.cantidad));
       }
@@ -2271,27 +2175,12 @@
     }catch(e){ console.error('Error al sincronizar programación:', e); }
   }
 
-  /* ---------------------------------------------------------
-     Render de listas (Admin y Operativo)
-  --------------------------------------------------------- */
   var ESTADO_LABEL = {pendiente:'Pendiente', programado:'Programado', atendido:'Atendido'};
 
   function findTT(rec, codigo){
     return (rec.tts||[]).find(function(t){ return t.codigo === codigo; });
   }
 
-  /* ---------------------------------------------------------
-     Cargue de un TT con VARIOS BL.
-     Estados de un TT dentro de una programación:
-       libre     -> sin nada asignado
-       cargando  -> cargue en curso: se le van agregando BL y cantidades
-                    (se descuentan del "faltan" del BL como reserva, pero
-                    todavía NO se registra en el historial)
-       cargado   -> cargue confirmado: ahí sí queda en el historial
-     Guardamos las líneas en tt.cargas = [{bl, cantidad}, ...].
-     Los registros viejos (un solo BL en currentBl/currentCantidad)
-     se siguen entendiendo gracias a ttLineas().
-  --------------------------------------------------------- */
   function ttLineas(tt){
     if(tt && Array.isArray(tt.cargas)){
       return tt.cargas.map(function(l){ return {bl: l.bl, cantidad: Number(l.cantidad || 0)}; });
@@ -2308,7 +2197,6 @@
     return {codigo: t.codigo, operador: t.operador, cc: t.cc, estado: estado, cargas: cargas,
             ultimoPor: quien, ultimaAccion: accion};
   }
-  /* Devuelve las cantidades de "lineas" a sus BL (suben el "faltan") */
   function devolverAItems(items, lineas){
     return (items||[]).map(function(it){
       var suma = lineas.filter(function(l){ return l.bl === it.bl; })
@@ -2322,7 +2210,6 @@
     return (cur.tts||[]).map(function(t){ return t.codigo === ttCodigo ? nuevo : t; });
   }
 
-  /* QUITAR UNA LÍNEA del cargue en curso: esa cantidad vuelve al BL */
   async function quitarLinea(r, ttCodigo, bl){
     var quienNombre = currentSession ? currentSession.nombre : null;
     return mutateRecord(r.id, function(cur){
@@ -2346,7 +2233,6 @@
     });
   }
 
-  /* CANCELAR EL CARGUE EN CURSO: todo lo agregado vuelve a sus BL y el TT queda libre */
   async function cancelarCargue(r, ttCodigo){
     var t0 = findTT(r, ttCodigo);
     var ok = await customConfirm('¿Cancelar el cargue en curso del TT# '+ttCodigo+'?\n\n'+
@@ -2367,29 +2253,6 @@
     });
   }
 
-  /* CONFIRMAR CARGUE: el TT queda cargado con todos sus BL y recién ahí
-     se registra en el historial (una fila por BL). */
-  /* ---------------------------------------------------------
-     Correo para aviso de cargue (lo configura/edita el rol "admin")
-     ---------------------------------------------------------
-     Se guarda en Supabase (tabla "configuracion", mismo formato
-     id/data/updated_at que "programaciones" y "usuarios") para que
-     quede igual para todos los dispositivos. Si esa tabla todavía
-     no existe o no hay Supabase, se guarda solo en este dispositivo
-     (localStorage) y la app sigue funcionando igual.
-
-     Para crear la tabla en Supabase (una sola vez), en el SQL Editor:
-
-     create table if not exists configuracion (
-       id text primary key,
-       data jsonb,
-       updated_at timestamptz default now()
-     );
-     alter table configuracion enable row level security;
-     create policy "lectura configuracion" on configuracion for select using (true);
-     create policy "escritura configuracion" on configuracion for insert with check (true);
-     create policy "actualizacion configuracion" on configuracion for update using (true);
-  --------------------------------------------------------- */
   var CONFIG_TABLE = 'configuracion';
   var CONFIG_CORREO_ID = 'correo_cargue';
   var configEmailCache = '';
@@ -2487,8 +2350,6 @@
     }
   }
 
-  /* Correo de aviso al confirmar un cargue: se abre listo en Gmail,
-     solo falta darle "Enviar" desde ahí. */
   function abrirGmailCompose(to, subject, body){
     var url = 'https://mail.google.com/mail/?view=cm&fs=1&to='+encodeURIComponent(to)+
       '&su='+encodeURIComponent(subject)+'&body='+encodeURIComponent(body);
@@ -2565,11 +2426,6 @@
     }
   }
 
-  /* Historial de movimientos: queda guardado por separado, para
-     poder consultarlo después aunque la programación se finalice.
-     Cubre cargar, reversar, liberar y quitar TT.
-     Si no hay Supabase configurado, simplemente no se registra
-     (la app sigue funcionando igual para todo lo demás). */
   async function logMovimiento(datos){
     if(!supabaseConfigured || !supabaseClient) return;
     var quien = usuariosCache.find(function(u){ return currentSession && u.id === currentSession.id; });
@@ -2593,12 +2449,6 @@
     }
   }
 
-  /* CARGAR BL A UN TT (uno o varios a la vez) y confirmar el cargue.
-     - Se puede hacer varias veces sobre el mismo TT: las líneas se van sumando
-       (TT 1 lleva BL A; después se le agrega BL B y BL C) hasta que se reverse o libere.
-     - Todo o nada: si una cantidad no cabe, no se guarda ninguna.
-     - Al historial solo se envía lo NUEVO de esta confirmación (una fila por BL);
-       lo que el TT ya llevaba confirmado quedó registrado antes. */
   async function cargarVarios(r, ttCodigo, nuevas){
     var t0 = findTT(r, ttCodigo);
     var quienNombre = currentSession ? currentSession.nombre : null;
@@ -2620,7 +2470,6 @@
         var ya = lineas.find(function(l){ return l.bl === n.bl; });
         if(ya) ya.cantidad += n.cantidad; else lineas.push({bl: n.bl, cantidad: n.cantidad});
       }
-      /* un cargue "a medias" de una versión anterior nunca se registró: se registra ahora */
       lineasLog = (tt.estado === 'cargando' ? previas : []).concat(nuevas);
       return {
         fields: {
@@ -2630,7 +2479,13 @@
         message: 'TT# '+ttCodigo+' cargado: '+lineas.map(function(l){ return 'Bl '+l.bl+' ('+l.cantidad+')'; }).join(' + ')+'.'
       };
     });
-    if(ok) logLineas(r, ttCodigo, t0, 'cargar', lineasLog);
+    if(ok){
+      logLineas(r, ttCodigo, t0, 'cargar', lineasLog);
+      /* Aviso de correo: se dispara con lo que se cargó en ESTA confirmación
+         (antes solo pasaba por el flujo viejo "confirmarCargue" y nunca se
+         llamaba desde aquí, que es el botón que la app realmente usa). */
+      ofrecerEnviarCorreoCargue(r, t0 || {codigo: ttCodigo, operador: '-', cc: '-'}, nuevas);
+    }
     return ok;
   }
 
@@ -2644,7 +2499,6 @@
     });
   }
 
-  /* REVERSAR: se deshace el cargue confirmado. Las cantidades de TODOS sus BL VUELVEN a cada BL. */
   async function reversarCarga(r, ttCodigo){
     var t0 = findTT(r, ttCodigo);
     var lineas0 = t0 ? ttLineas(t0) : [];
@@ -2669,7 +2523,6 @@
     if(ok2) logLineas(r, ttCodigo, t0, 'reversar', lineasLog);
   }
 
-  /* LIBERAR: el TT queda libre para otra carga, pero lo que llevó NO vuelve a los BL. */
   async function liberarCarga(r, ttCodigo){
     var t0 = findTT(r, ttCodigo);
     var lineas0 = t0 ? ttLineas(t0) : [];
@@ -2691,7 +2544,6 @@
     if(ok2) logLineas(r, ttCodigo, t0, 'liberar', lineasLog);
   }
 
-  /* QUITAR: saca un TT libre de la programación */
   async function quitarTT(r, ttCodigo){
     var ok = await customConfirm('¿Quitar el TT# '+ttCodigo+' de esta programación?');
     if(!ok) return;
@@ -2715,9 +2567,6 @@
 
   var collapsedState = {};
 
-  /* Las tarjetas de TT/BL programados nacen contraídas (ver recordCard).
-     Tocar el título las abre/cierra; tocar en cualquier otra parte de la
-     pantalla mientras una está abierta la vuelve a contraer. */
   document.addEventListener('click', function(e){
     document.querySelectorAll('.rec-sec.sec-tt.collapsible, .rec-sec.sec-bl.collapsible').forEach(function(sec){
       if(sec.classList.contains('collapsed')) return;
@@ -2742,7 +2591,7 @@
       '</div>';
 
     left.querySelector('.btn-cancelar-route').addEventListener('click', function(){
-      onRecords(lastRecords, true); /* vuelve a pintar todo tal como está en la base */
+      onRecords(lastRecords, true);
     });
     left.querySelector('.btn-guardar-route').addEventListener('click', async function(){
       var origen = left.querySelector('.edit-origen').value.trim().toUpperCase();
@@ -2882,7 +2731,7 @@
     }
 
     if(opts.editableStatus){
-      var ttsLibres = (r.tts||[]).slice(); /* todos: un TT ya cargado puede seguir recibiendo BL */
+      var ttsLibres = (r.tts||[]).slice();
       var itemsConRestante = (r.items||[]).filter(function(it){ return (it.restante != null ? it.restante : it.cantidad) > 0; });
       if(ttsLibres.length && itemsConRestante.length){
         var cargaDiv = document.createElement('div');
@@ -2913,7 +2762,7 @@
           cargaDiv.querySelectorAll('.carga-bl-row').forEach(function(row){
             var txt = row.querySelector('.inp-carga-cant').value;
             var cant = parseInt(txt, 10);
-            if(!cant || cant <= 0) return; /* vacío o 0: ese BL no va en este TT */
+            if(!cant || cant <= 0) return;
             var max = Number(row.dataset.max);
             if(cant > max && !error) error = 'Bl '+row.dataset.bl+': la cantidad supera lo que falta ('+max+').';
             lineas.push({bl: row.dataset.bl, cantidad: cant});
@@ -2921,7 +2770,6 @@
           });
           if(error){ showToast(error); return; }
           if(!lineas.length){ showToast('Escribe la cantidad de al menos un BL.'); return; }
-          /* se limpian las cantidades al instante para no cargarlas dos veces; si falla, se devuelven */
           cargaDiv.querySelectorAll('.inp-carga-cant').forEach(function(i){ i.value = ''; });
           cargarVarios(r, ttCodigo, lineas).then(function(ok){
             if(ok) return;
@@ -2938,21 +2786,21 @@
     if(ttsEnCargue.length){
       var enDiv = document.createElement('div');
       enDiv.className = 'rec-tt rec-sec sec-encargue';
-      var enHtml = '<div class=\"tt-title\"><span>Cargue en curso<span class=\"tt-count\">'+ttsEnCargue.length+'</span></span></div>';
+      var enHtml = '<div class="tt-title"><span>Cargue en curso<span class="tt-count">'+ttsEnCargue.length+'</span></span></div>';
       ttsEnCargue.forEach(function(tt){
         var lineas = ttLineas(tt);
-        enHtml += '<div class=\"cargue-item\" data-tt=\"'+esc(tt.codigo)+'\">'+
-          '<div class=\"cargue-head\"><b>TT# '+esc(tt.codigo)+'</b> &middot; '+esc(tt.operador)+
-          (tt.ultimoPor ? '<div class=\"tt-op-meta\">Última actualización por <b>'+esc(tt.ultimoPor)+'</b></div>' : '')+'</div>';
+        enHtml += '<div class="cargue-item" data-tt="'+esc(tt.codigo)+'">'+
+          '<div class="cargue-head"><b>TT# '+esc(tt.codigo)+'</b> &middot; '+esc(tt.operador)+
+          (tt.ultimoPor ? '<div class="tt-op-meta">Última actualización por <b>'+esc(tt.ultimoPor)+'</b></div>' : '')+'</div>';
         lineas.forEach(function(l){
-          enHtml += '<div class=\"cargue-linea\" data-bl=\"'+esc(l.bl)+'\"><span>Bl '+esc(l.bl)+' - Cant. '+esc(l.cantidad)+'</span>'+
-            (opts.editableStatus ? '<button type=\"button\" class=\"icon-btn btn-quitar-linea\" title=\"Quitar este BL del cargue\">&times;</button>' : '')+
+          enHtml += '<div class="cargue-linea" data-bl="'+esc(l.bl)+'"><span>Bl '+esc(l.bl)+' - Cant. '+esc(l.cantidad)+'</span>'+
+            (opts.editableStatus ? '<button type="button" class="icon-btn btn-quitar-linea" title="Quitar este BL del cargue">&times;</button>' : '')+
           '</div>';
         });
         if(opts.editableStatus){
-          enHtml += '<div class=\"cargue-actions\">'+
-            '<button type=\"button\" class=\"btn btn-sm btn-confirmar-cargue\">Confirmar cargue</button>'+
-            '<button type=\"button\" class=\"btn ghost btn-sm btn-cancelar-cargue\">Cancelar cargue</button>'+
+          enHtml += '<div class="cargue-actions">'+
+            '<button type="button" class="btn btn-sm btn-confirmar-cargue">Confirmar cargue</button>'+
+            '<button type="button" class="btn ghost btn-sm btn-cancelar-cargue">Cancelar cargue</button>'+
           '</div>';
         }
         enHtml += '</div>';
@@ -2981,19 +2829,19 @@
     if(ttsCargados.length){
       var cargasDiv = document.createElement('div');
       cargasDiv.className = 'rec-tt rec-sec sec-cargas';
-      var cargasHtml = '<div class=\"tt-title\"><span>Cargas<span class=\"tt-count\">'+ttsCargados.length+'</span></span></div>';
+      var cargasHtml = '<div class="tt-title"><span>Cargas<span class="tt-count">'+ttsCargados.length+'</span></span></div>';
       ttsCargados.forEach(function(tt){
         var lineasHtml = ttLineas(tt).map(function(l){
           return '<div>Bl '+esc(l.bl)+' - Cant. '+esc(l.cantidad)+'</div>';
         }).join('');
-        cargasHtml += '<div class=\"tt-programado-item\" data-tt=\"'+esc(tt.codigo)+'\">'+
-          '<div class=\"info carga-lineas\"><b>TT# '+esc(tt.codigo)+'</b>'+lineasHtml+
-          (tt.ultimoPor ? '<div class=\"tt-op-meta\">Cargado por <b>'+esc(tt.ultimoPor)+'</b></div>' : '')+
+        cargasHtml += '<div class="tt-programado-item" data-tt="'+esc(tt.codigo)+'">'+
+          '<div class="info carga-lineas"><b>TT# '+esc(tt.codigo)+'</b>'+lineasHtml+
+          (tt.ultimoPor ? '<div class="tt-op-meta">Cargado por <b>'+esc(tt.ultimoPor)+'</b></div>' : '')+
           '</div>'+
           (opts.editableStatus ?
-            '<div class=\"carga-actions\">'+
-              '<button type=\"button\" class=\"btn danger btn-sm btn-reversar\">Reversar</button>'+
-              '<button type=\"button\" class=\"btn secondary btn-sm btn-liberar-carga\">Liberar</button>'+
+            '<div class="carga-actions">'+
+              '<button type="button" class="btn danger btn-sm btn-reversar">Reversar</button>'+
+              '<button type="button" class="btn secondary btn-sm btn-liberar-carga">Liberar</button>'+
             '</div>' : '')+
           '</div>';
       });
@@ -3061,8 +2909,6 @@
 
   var lastRecordsSig = null;
 
-  /* Al llegar un cambio en vivo se repinta todo; esto conserva lo que la persona
-     estaba llenando en el formulario "Cargar" (TT, BL y cantidad) y el foco. */
   function captureCargaState(){
     var st = {};
     document.querySelectorAll('.carga-form[data-rec-id]').forEach(function(f){
@@ -3096,7 +2942,6 @@
   var rawRecords = [];
   var purging = {};
 
-  /* Quita de la pantalla y de la base lo que ya venció (23:59 del día programado) */
   function purgeExpired(list){
     list.forEach(function(r){
       if(purging[r.id]) return;
@@ -3115,7 +2960,7 @@
     records = rawRecords.filter(function(r){ return !isExpired(r); });
     records = records.slice().sort(function(a,b){ return (b.createdAt||0)-(a.createdAt||0); });
     var sig = JSON.stringify(records);
-    if(!force && sig === lastRecordsSig) return; /* nada cambió: no repintar */
+    if(!force && sig === lastRecordsSig) return;
     lastRecordsSig = sig;
     lastRecords = records;
     hydrateAdminFromCurrent(records);
@@ -3127,7 +2972,6 @@
     restoreCargaState(saved);
   }
 
-  /* Revisa cada 20 s si alguna programación llegó a las 23:59 */
   setInterval(function(){
     if(rawRecords.some(isExpired)) onRecords(rawRecords, true);
   }, 20000);
@@ -3136,9 +2980,6 @@
   document.getElementById('btnRefreshAdminTraslados').addEventListener('click', function(){ onRecords(lastRecords, true); showToast('Actualizado.'); });
   document.getElementById('btnGuardarCorreoCargue').addEventListener('click', guardarCorreoCargue);
 
-  /* ---------------------------------------------------------
-     Historial de despachos: consulta por fecha (solo Admin)
-  --------------------------------------------------------- */
   document.getElementById('fDespachoFecha').valueAsDate = new Date();
 
   function renderDespachos(rows){
@@ -3202,7 +3043,6 @@
 
   document.getElementById('btnRefreshAdministradorProg').addEventListener('click', function(){ onRecords(lastRecords, true); showToast('Actualizado.'); });
 
-  /* Pestañas internas de Administrador: Programar traslado / Programaciones */
   var tabCapturarBtn = document.getElementById('tabCapturarBtn');
   var tabProgramacionesBtn = document.getElementById('tabProgramacionesBtn');
   var tabCapturarContent = document.getElementById('tabCapturarContent');
@@ -3219,9 +3059,6 @@
   tabProgramacionesBtn.addEventListener('click', function(){ showAdminTab('programaciones'); });
   document.getElementById('btnRefreshVer').addEventListener('click', function(){ onRecords(lastRecords, true); showToast('Actualizado.'); });
 
-  /* ---------------------------------------------------------
-     Roles y sesión (Admin, Administrador, Operativo, Ver)
-  --------------------------------------------------------- */
   var viewAdmin = document.getElementById('viewAdmin');
   var viewOp = document.getElementById('viewOp');
   var viewVer = document.getElementById('viewVer');
@@ -3303,7 +3140,6 @@
   }
   document.getElementById('btnLogout').addEventListener('click', logout);
 
-  /* Menú desplegable de sesión (chip compacto en el header) */
   (function(){
     var sessionInfoEl = document.getElementById('sessionInfo');
     var chipBtn = document.getElementById('sessionChipBtn');
@@ -3319,9 +3155,6 @@
     });
   })();
 
-  /* ---------------------------------------------------------
-     Cambiar mi contraseña (con doble validación)
-  --------------------------------------------------------- */
   var cpOverlay = document.getElementById('changePasswordOverlay');
   var cpActual = document.getElementById('cpActual');
   var cpNueva = document.getElementById('cpNueva');
@@ -3344,7 +3177,7 @@
     cpActual.focus();
   }
   function closeChangePassword(){
-    if(cpForced) return; /* obligatorio: no se puede cerrar sin cambiarla */
+    if(cpForced) return;
     cpOverlay.style.display = 'none';
   }
 
@@ -3458,9 +3291,6 @@
     document.getElementById('correoCargueToggle').parentElement.classList.toggle('collapsed');
   });
 
-  /* ---------------------------------------------------------
-     Gestión de usuarios (solo rol Admin)
-  --------------------------------------------------------- */
   document.getElementById('gestionUsuariosToggle').addEventListener('click', function(){
     document.getElementById('gestionUsuariosToggle').parentElement.classList.toggle('collapsed');
   });
@@ -3487,8 +3317,6 @@
   forceUpperCase(document.getElementById('bsUsuario'));
   forceUpperCase(document.getElementById('loginUsuario'));
 
-  /* Mayúscula sostenida en todo el formato: cualquier campo de texto o contraseña,
-     también los que se dibujan después (edición de ruta, etc.). */
   document.addEventListener('input', function(e){
     var el = e.target;
     if(!el || (el.tagName !== 'INPUT' && el.tagName !== 'TEXTAREA')) return;
@@ -3502,8 +3330,6 @@
     }
   });
 
-  /* Las contraseñas también van en mayúscula: se comparan sin distinguir mayúsculas,
-     así las que se crearon antes en minúscula siguen funcionando. */
   function normPwd(p){ return String(p == null ? '' : p).trim().toUpperCase(); }
 
   function clearUsuarioEntry(){
@@ -3626,9 +3452,6 @@
     }
   }
 
-  /* ---------------------------------------------------------
-     Arranque
-  --------------------------------------------------------- */
   renderTTProgramados();
   renderItemsProgramados();
   document.getElementById('fFecha').value = todayISO();
@@ -3643,8 +3466,6 @@
 </script>
 
 <script>
-/* Botón "Instalar app": Chrome/Edge/Android avisan cuando la PWA
-   es instalable; guardamos ese aviso y lo disparamos con el botón. */
 (function(){
   var deferredPrompt = null;
   var btn = document.getElementById('btnInstalarApp');
@@ -3671,16 +3492,6 @@
 </script>
 
 <script>
-/* =========================================================
-   Registro del Service Worker (PWA instalable + auto-actualización)
-   ---------------------------------------------------------
-   Solo funciona cuando el archivo se abre por https:// (o
-   localhost), sirviendo index.html, manifest.json y
-   service-worker.js desde la misma carpeta. Si lo abres
-   directo desde tu computador (file://) esta parte se omite
-   sola y la app sigue funcionando igual, solo que sin modo
-   instalable ni uso sin internet.
-========================================================= */
 (function(){
   if(!('serviceWorker' in navigator)) return;
   if(location.protocol !== 'https:' && location.hostname !== 'localhost') return;
@@ -3699,8 +3510,6 @@
       if(!nuevo) return;
       nuevo.addEventListener('statechange', function(){
         if(nuevo.state === 'installed' && navigator.serviceWorker.controller){
-          /* Hay una versión nueva lista: la activamos de una vez.
-             El listener de 'controllerchange' de arriba recarga la página sola. */
           nuevo.postMessage({type: 'SKIP_WAITING'});
         }
       });
