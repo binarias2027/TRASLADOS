@@ -2388,10 +2388,18 @@
     }
   }
 
-  function abrirGmailCompose(to, subject, body){
-    var url = 'https://mail.google.com/mail/?view=cm&fs=1&to='+encodeURIComponent(to)+
-      '&su='+encodeURIComponent(subject)+'&body='+encodeURIComponent(body);
-    window.open(url, '_blank');
+  /* Envía el correo de verdad, a través de la Edge Function de Supabase
+     (que a su vez habla con Resend). La llave de Resend nunca está en
+     este archivo ni en el navegador. */
+  async function enviarCorreoViaResend(to, subject, text){
+    if(!supabaseClient){
+      throw new Error('Supabase no está conectado en este momento.');
+    }
+    var res = await supabaseClient.functions.invoke('enviar-correo-cargue', {
+      body: {to: to, subject: subject, text: text}
+    });
+    if(res.error) throw res.error;
+    return res.data;
   }
 
   function buildCargueEmailText(r, tt, lineas){
@@ -2427,7 +2435,15 @@
     var ok = await customConfirm('¿Enviar un correo con el resumen del TT# '+tt.codigo+' a '+correo+'?');
     if(!ok) return;
     var asunto = 'Cargue TT# '+tt.codigo+' - '+r.origen+' a '+r.destino;
-    abrirGmailCompose(correo, asunto, buildCargueEmailText(r, tt, lineas));
+    var cuerpo = buildCargueEmailText(r, tt, lineas);
+    showToast('Enviando correo…');
+    try{
+      await enviarCorreoViaResend(correo, asunto, cuerpo);
+      showToast('Correo enviado a '+correo+'.');
+    }catch(e){
+      console.error('No se pudo enviar el correo:', e);
+      showToast('No se pudo enviar el correo. Revisa que la función de Resend esté publicada.');
+    }
   }
 
   async function confirmarCargue(r, ttCodigo){
