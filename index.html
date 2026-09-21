@@ -1589,7 +1589,24 @@
       showToast((out && out.error) || 'No se pudo completar la acción.');
       return false;
     }
-    out.fields.estado = calcEstado(Object.assign({}, cur, out.fields));
+    var merged = Object.assign({}, cur, out.fields);
+    var estado = calcEstado(merged);
+    out.fields.estado = estado;
+
+    /* Ya se recogió todo (todos los BL en 0) y ningún TT quedó cargado:
+       se cierra sola, como si le hubieran dado "Finalizar traslado". */
+    if(estado === 'atendido'){
+      try{
+        await deleteRecord(id);
+      }catch(e){
+        showToast('Se completó, pero no se pudo cerrar sola. Dale "Finalizar traslado" manualmente.');
+        return false;
+      }
+      showToast((out.message ? out.message + ' ' : '') + 'Traslado completo: se cerró automáticamente.');
+      if(id === currentRecordId){ resetForm(); }
+      return true;
+    }
+
     try{
       await updateRecordFields(id, out.fields);
     }catch(e){
