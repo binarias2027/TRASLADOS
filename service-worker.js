@@ -10,7 +10,7 @@
        (con conexión a internet), sin tener que desinstalar
        ni reinstalar nada.
 ========================================================= */
-const CACHE_VERSION = 'v19';
+const CACHE_VERSION = 'v20';
 const CACHE_NAME = 'spb-traslado-' + CACHE_VERSION;
 
 const PRECACHE_URLS = [
@@ -80,12 +80,18 @@ function handleNavigation(event){
    va a buscar la versión nueva a la red para la próxima vez
    (stale-while-revalidate). */
 function handleAsset(event){
+  /* Las llamadas a Supabase (datos en tiempo real) nunca se cachean:
+     que las maneje siempre la red, directo. */
+  if(event.request.url.indexOf('supabase.co') !== -1) return;
+
   event.respondWith(
     caches.match(event.request).then(function(cached){
       var network = fetch(event.request).then(function(response){
         if(response && response.status === 200){
           var copy = response.clone();
-          caches.open(CACHE_NAME).then(function(cache){ cache.put(event.request, copy); });
+          caches.open(CACHE_NAME).then(function(cache){
+            cache.put(event.request, copy).catch(function(){ /* ignorar: algunas peticiones no se pueden cachear */ });
+          });
         }
         return response;
       }).catch(function(){ return cached; });
@@ -96,6 +102,11 @@ function handleAsset(event){
 
 self.addEventListener('fetch', function(event){
   if(event.request.method !== 'GET') return;
+
+  /* Ignora por completo cualquier cosa que no sea de la propia página
+     (extensiones del navegador, chrome-extension://, etc.) — nunca se
+     pueden guardar en caché y no tienen nada que ver con esta app. */
+  if(!event.request.url.startsWith('http')) return;
 
   if(event.request.mode === 'navigate'){
     handleNavigation(event);
