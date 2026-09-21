@@ -774,6 +774,24 @@
   }
   @keyframes spin{to{transform:rotate(360deg);}}
 
+  /* Botón Correo: animación de envío + contador */
+  .btn-correo-carga{display:inline-flex;align-items:center;justify-content:center;gap:6px;transition:background .2s,color .2s,border-color .2s;}
+  .btn-correo-carga .correo-count{
+    min-width:20px;padding:0 6px;border-radius:999px;background:var(--spb-blue);color:#fff;
+    font-size:11.5px;font-weight:700;line-height:20px;text-align:center;
+  }
+  .btn-correo-carga.enviando{pointer-events:none;opacity:.9;animation:correoPulso 1s ease-in-out infinite;}
+  .btn-correo-carga.enviando::before{
+    content:"";width:13px;height:13px;border-radius:50%;
+    border:2px solid currentColor;border-top-color:transparent;
+    animation:spin .7s linear infinite;
+  }
+  .btn-correo-carga.ok{background:#2e7d32;color:#fff;}
+  .btn-correo-carga.ok .correo-count{background:#fff;color:#2e7d32;}
+  .btn-correo-carga.err{background:#c0392b;color:#fff;}
+  .btn-correo-carga.err .correo-count{background:#fff;color:#c0392b;}
+  @keyframes correoPulso{50%{opacity:.55;}}
+
   main{visibility:hidden;}
   main.ready{visibility:visible;}
 
@@ -1084,7 +1102,7 @@
         <span class="chevron">&#9662;</span>
       </div>
       <div class="collapsible-content">
-      <p class="sub">Cuando Operativo confirme el cargue de un TT, se le va a ofrecer enviar un correo con el resumen a esta dirección (se abre en Gmail, listo para dar "Enviar"). Puedes cambiarla cuando quieras.</p>
+      <p class="sub">En cada TT cargado, el botón "Correo" envía el resumen a esta dirección (el número del botón cuenta las veces que se ha enviado). Puedes cambiarla cuando quieras.</p>
       <div class="grid2">
         <div class="field">
           <label>Correo</label>
@@ -2233,7 +2251,8 @@
   }
   function ttNuevo(t, estado, cargas, quien, accion){
     return {codigo: t.codigo, operador: t.operador, cc: t.cc, estado: estado, cargas: cargas,
-            ultimoPor: quien, ultimaAccion: accion};
+            ultimoPor: quien, ultimaAccion: accion,
+            correos: estado === 'libre' ? 0 : Number(t.correos || 0)};
   }
   function devolverAItems(items, lineas){
     return (items||[]).map(function(it){
@@ -2425,25 +2444,74 @@
     return lines.join('\n');
   }
 
+  /* Si lo pones en true, al confirmar un cargue el correo sale solo
+     (sin preguntar). En false, el correo se envía solo con el botón "Correo". */
+  var ENVIAR_CORREO_AUTOMATICO = false;
+
+  var correosEnviando = {};   /* claves "idProgramacion|TT" con envío en curso */
+  var correosOk = {};         /* claves con el "¡Enviado!" visible unos segundos */
+  var correosErr = {};
+
+  function correoBtnsDe(key){
+    return Array.prototype.filter.call(document.querySelectorAll('.btn-correo-carga'), function(b){
+      return b.dataset.key === key;
+    });
+  }
+  function pintarCorreoBtn(key){
+    var cls = correosEnviando[key] ? 'enviando' : (correosOk[key] ? 'ok' : (correosErr[key] ? 'err' : ''));
+    var txt = correosEnviando[key] ? 'Enviando…' : (correosOk[key] ? '¡Enviado!' : (correosErr[key] ? 'Reintentar' : 'Correo'));
+    correoBtnsDe(key).forEach(function(b){
+      b.classList.remove('enviando','ok','err');
+      if(cls) b.classList.add(cls);
+      b.querySelector('.txt').textContent = txt;
+    });
+  }
+  function flashCorreo(mapa, key){
+    mapa[key] = true;
+    pintarCorreoBtn(key);
+    setTimeout(function(){ delete mapa[key]; pintarCorreoBtn(key); }, 2200);
+  }
+
   async function ofrecerEnviarCorreoCargue(r, tt, lineas){
     var correo = (configEmailCache || '').trim();
     if(!lineas.length){ showToast('Este TT no tiene carga registrada.'); return; }
     if(!correo){
-      showToast('No hay correo de aviso configurado. El Admin puede configurarlo en "Correo para aviso de cargue".');
+      showToast('No hay correo de aviso configurado. El Admin puede configurarlo en \"Correo para aviso de cargue\".');
       return;
     }
-    var ok = await customConfirm('¿Enviar un correo con el resumen del TT# '+tt.codigo+' a '+correo+'?');
-    if(!ok) return;
+    var key = r.id+'|'+tt.codigo;
+    if(correosEnviando[key]) return;          /* evita doble clic */
+    delete correosOk[key]; delete correosErr[key];
+    correosEnviando[key] = true;
+    pintarCorreoBtn(key);
+
     var asunto = 'Cargue TT# '+tt.codigo+' - '+r.origen+' a '+r.destino;
     var cuerpo = buildCargueEmailText(r, tt, lineas);
-    showToast('Enviando correo…');
     try{
       await enviarCorreoViaResend(correo, asunto, cuerpo);
-      showToast('Correo enviado a '+correo+'.');
     }catch(e){
       console.error('No se pudo enviar el correo:', e);
+      delete correosEnviando[key];
+      flashCorreo(correosErr, key);
       showToast('No se pudo enviar el correo. Revisa que la función de Resend esté publicada.');
+      return;
     }
+
+    /* Se envió: sumamos 1 al contador del TT (leyendo el dato fresco, así
+       no se pierde la cuenta si alguien más también envía). */
+    var nuevoConteo = null;
+    await mutateRecord(r.id, function(cur){
+      var t = findTT(cur, tt.codigo);
+      if(!t) return {error: 'El TT# '+tt.codigo+' ya no está en esta programación.'};
+      nuevoConteo = Number(t.correos || 0) + 1;
+      var copia = Object.assign({}, t, {correos: nuevoConteo});
+      return {fields: {tts: reemplazarTT(cur, tt.codigo, copia)}};
+    });
+    delete correosEnviando[key];
+    if(nuevoConteo != null){
+      correoBtnsDe(key).forEach(function(b){ b.querySelector('.correo-count').textContent = nuevoConteo; });
+    }
+    flashCorreo(correosOk, key);
   }
 
   async function confirmarCargue(r, ttCodigo){
@@ -2476,7 +2544,7 @@
           cantidad: l.cantidad
         });
       });
-      ofrecerEnviarCorreoCargue(r, t0 || {codigo: ttCodigo, operador: '-', cc: '-'}, lineasLog);
+      if(ENVIAR_CORREO_AUTOMATICO) ofrecerEnviarCorreoCargue(r, t0 || {codigo: ttCodigo, operador: '-', cc: '-'}, lineasLog);
     }
   }
 
@@ -2538,7 +2606,7 @@
       /* Aviso de correo: se dispara con lo que se cargó en ESTA confirmación
          (antes solo pasaba por el flujo viejo "confirmarCargue" y nunca se
          llamaba desde aquí, que es el botón que la app realmente usa). */
-      ofrecerEnviarCorreoCargue(r, t0 || {codigo: ttCodigo, operador: '-', cc: '-'}, nuevas);
+      if(ENVIAR_CORREO_AUTOMATICO) ofrecerEnviarCorreoCargue(r, t0 || {codigo: ttCodigo, operador: '-', cc: '-'}, nuevas);
     }
     return ok;
   }
@@ -2894,7 +2962,13 @@
           '</div>'+
           (opts.editableStatus ?
             '<div class="carga-actions">'+
-              '<button type="button" class="btn secondary btn-sm btn-correo-carga">Correo</button>'+
+              (function(){
+                var kc = r.id+'|'+tt.codigo;
+                var cls = correosEnviando[kc] ? ' enviando' : (correosOk[kc] ? ' ok' : (correosErr[kc] ? ' err' : ''));
+                var txt = correosEnviando[kc] ? 'Enviando…' : (correosOk[kc] ? '¡Enviado!' : (correosErr[kc] ? 'Reintentar' : 'Correo'));
+                return '<button type="button" class="btn secondary btn-sm btn-correo-carga'+cls+'" data-key="'+esc(kc)+'" title="Enviar correo (veces enviado: '+Number(tt.correos||0)+')">'+
+                  '<span class="txt">'+txt+'</span><span class="correo-count">'+Number(tt.correos||0)+'</span></button>';
+              })()+
               '<button type="button" class="btn danger btn-sm btn-reversar">Reversar</button>'+
               '<button type="button" class="btn secondary btn-sm btn-liberar-carga">Liberar</button>'+
             '</div>' : '')+
