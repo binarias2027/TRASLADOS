@@ -10,7 +10,7 @@
        (con conexión a internet), sin tener que desinstalar
        ni reinstalar nada.
 ========================================================= */
-const CACHE_VERSION = 'v21';
+const CACHE_VERSION = 'v22';
 const CACHE_NAME = 'spb-traslado-' + CACHE_VERSION;
 
 const PRECACHE_URLS = [
