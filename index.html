@@ -2419,12 +2419,12 @@
 
   async function ofrecerEnviarCorreoCargue(r, tt, lineas){
     var correo = (configEmailCache || '').trim();
-    if(!lineas.length) return;
+    if(!lineas.length){ showToast('Este TT no tiene carga registrada.'); return; }
     if(!correo){
-      showToast('Cargue confirmado. (No hay correo de aviso configurado: el Admin puede configurarlo en "Correo para aviso de cargue".)');
+      showToast('No hay correo de aviso configurado. El Admin puede configurarlo en "Correo para aviso de cargue".');
       return;
     }
-    var ok = await customConfirm('Cargue confirmado. ¿Enviar un correo con el resumen a '+correo+'?');
+    var ok = await customConfirm('¿Enviar un correo con el resumen del TT# '+tt.codigo+' a '+correo+'?');
     if(!ok) return;
     var asunto = 'Cargue TT# '+tt.codigo+' - '+r.origen+' a '+r.destino;
     abrirGmailCompose(correo, asunto, buildCargueEmailText(r, tt, lineas));
@@ -2878,6 +2878,7 @@
           '</div>'+
           (opts.editableStatus ?
             '<div class="carga-actions">'+
+              '<button type="button" class="btn secondary btn-sm btn-correo-carga">Correo</button>'+
               '<button type="button" class="btn danger btn-sm btn-reversar">Reversar</button>'+
               '<button type="button" class="btn secondary btn-sm btn-liberar-carga">Liberar</button>'+
             '</div>' : '')+
@@ -2887,6 +2888,14 @@
       div.appendChild(cargasDiv);
 
       if(opts.editableStatus){
+        cargasDiv.querySelectorAll('.btn-correo-carga').forEach(function(btn){
+          var codigo = btn.closest('.tt-programado-item').dataset.tt;
+          btn.addEventListener('click', function(){
+            var tt = findTT(r, codigo);
+            if(!tt){ showToast('Ese TT ya no está en esta programación.'); return; }
+            ofrecerEnviarCorreoCargue(r, tt, ttLineas(tt));
+          });
+        });
         cargasDiv.querySelectorAll('.btn-reversar').forEach(function(btn){
           var codigo = btn.closest('.tt-programado-item').dataset.tt;
           btn.addEventListener('click', function(){ reversarCarga(r, codigo); });
