@@ -599,8 +599,6 @@
   .cargue-actions{display:flex;gap:6px;margin-top:8px;flex-wrap:wrap;}
   @media (max-width:480px){.cargue-actions .btn{flex:1;}}
   .carga-lineas div{font-size:13.5px;}
-  .carga-linea-bl{display:flex;align-items:center;justify-content:space-between;gap:8px;}
-  .carga-linea-bl .icon-btn{width:20px;height:20px;font-size:13px;flex-shrink:0;}
   .carga-pick-label,.carga-bls-hint{font-size:12px;color:var(--ink-soft);margin:2px 0 6px;}
   .carga-tt-pick select{width:100%;}
   .carga-bls{margin:8px 0 4px;}
@@ -775,32 +773,6 @@
     animation:spin .8s linear infinite;
   }
   @keyframes spin{to{transform:rotate(360deg);}}
-
-  /* Botón Correo: animación de envío + contador */
-  .btn-correo-carga{display:inline-flex;align-items:center;justify-content:center;gap:6px;transition:background .2s,color .2s,border-color .2s;}
-  .btn-correo-carga .correo-count{
-    min-width:20px;padding:0 6px;border-radius:999px;background:var(--spb-blue);color:#fff;
-    font-size:11.5px;font-weight:700;line-height:20px;text-align:center;
-  }
-  .btn-correo-carga.enviando{pointer-events:none;opacity:.9;animation:correoPulso 1s ease-in-out infinite;}
-  .btn-correo-carga.enviando::before{
-    content:"";width:13px;height:13px;border-radius:50%;
-    border:2px solid currentColor;border-top-color:transparent;
-    animation:spin .7s linear infinite;
-  }
-  .flag-correo{
-    display:inline-flex;align-items:center;gap:5px;margin-top:5px;padding:2px 9px 2px 7px;
-    border-radius:999px;background:#e6f4ea;color:#1e7a34;border:1px solid #a5d6b1;
-    font-size:11.5px;font-weight:700;letter-spacing:.2px;
-  }
-  .flag-correo svg{width:12px;height:12px;flex-shrink:0;}
-  .flag-correo.nuevo{animation:flagPop .45s ease-out;}
-  @keyframes flagPop{0%{transform:scale(.6);opacity:0;}70%{transform:scale(1.08);}100%{transform:scale(1);opacity:1;}}
-  .btn-correo-carga.ok{background:#2e7d32;color:#fff;}
-  .btn-correo-carga.ok .correo-count{background:#fff;color:#2e7d32;}
-  .btn-correo-carga.err{background:#c0392b;color:#fff;}
-  .btn-correo-carga.err .correo-count{background:#fff;color:#c0392b;}
-  @keyframes correoPulso{50%{opacity:.55;}}
 
   main{visibility:hidden;}
   main.ready{visibility:visible;}
@@ -1112,7 +1084,7 @@
         <span class="chevron">&#9662;</span>
       </div>
       <div class="collapsible-content">
-      <p class="sub">En cada TT cargado, el botón "Correo" envía el resumen a esta dirección (el número del botón cuenta las veces que se ha enviado). Puedes cambiarla cuando quieras.</p>
+      <p class="sub">Cuando Operativo confirme el cargue de un TT, se le va a ofrecer enviar un correo con el resumen a esta dirección (se abre en Gmail, listo para dar "Enviar"). Puedes cambiarla cuando quieras.</p>
       <div class="grid2">
         <div class="field">
           <label>Correo</label>
@@ -2094,7 +2066,6 @@
     if(data.fecha && data.fecha < todayISO()) errs.push('La fecha no puede ser anterior a hoy.');
     if(!data.origen) errs.push('Indica el origen.');
     if(!data.destino) errs.push('Indica el destino.');
-    if(!data.tts.length) errs.push('Agrega al menos un TT.');
     data.tts.forEach(function(tt, i){
       if(!tt.codigo) errs.push('Falta el código del TT #'+(i+1)+'.');
       if(!tt.operador) errs.push('Falta el nombre del operador del TT #'+(i+1)+'.');
@@ -2261,8 +2232,7 @@
   }
   function ttNuevo(t, estado, cargas, quien, accion){
     return {codigo: t.codigo, operador: t.operador, cc: t.cc, estado: estado, cargas: cargas,
-            ultimoPor: quien, ultimaAccion: accion,
-            correos: estado === 'libre' ? 0 : Number(t.correos || 0)};
+            ultimoPor: quien, ultimaAccion: accion};
   }
   function devolverAItems(items, lineas){
     return (items||[]).map(function(it){
@@ -2427,20 +2397,7 @@
     var res = await supabaseClient.functions.invoke('enviar-correo-cargue', {
       body: {to: to, subject: subject, text: text}
     });
-    if(res.error){
-      /* Traemos el mensaje real que devolvió la función (Resend/Supabase) */
-      var detalle = '';
-      try{
-        if(res.error.context && typeof res.error.context.json === 'function'){
-          var j = await res.error.context.json();
-          var er = j && j.error;
-          detalle = typeof er === 'string' ? er : (er && (er.message || JSON.stringify(er))) || '';
-        }
-      }catch(_){}
-      var err = new Error(detalle || res.error.message || 'Error al llamar la función');
-      err.detalle = detalle;
-      throw err;
-    }
+    if(res.error) throw res.error;
     return res.data;
   }
 
@@ -2467,77 +2424,25 @@
     return lines.join('\n');
   }
 
-  /* Si lo pones en true, al confirmar un cargue el correo sale solo
-     (sin preguntar). En false, el correo se envía solo con el botón "Correo". */
-  var ENVIAR_CORREO_AUTOMATICO = false;
-
-  var correosEnviando = {};   /* claves "idProgramacion|TT" con envío en curso */
-  var correosOk = {};         /* claves con el "¡Enviado!" visible unos segundos */
-  var correosErr = {};
-
-  function correoBtnsDe(key){
-    return Array.prototype.filter.call(document.querySelectorAll('.btn-correo-carga'), function(b){
-      return b.dataset.key === key;
-    });
-  }
-  function pintarCorreoBtn(key){
-    var cls = correosEnviando[key] ? 'enviando' : (correosOk[key] ? 'ok' : (correosErr[key] ? 'err' : ''));
-    var txt = correosEnviando[key] ? 'Enviando…' : (correosOk[key] ? '¡Enviado!' : (correosErr[key] ? 'Reintentar' : 'Correo'));
-    correoBtnsDe(key).forEach(function(b){
-      b.classList.remove('enviando','ok','err');
-      if(cls) b.classList.add(cls);
-      b.querySelector('.txt').textContent = txt;
-    });
-  }
-  function flashCorreo(mapa, key){
-    mapa[key] = true;
-    pintarCorreoBtn(key);
-    setTimeout(function(){ delete mapa[key]; pintarCorreoBtn(key); }, 2200);
-  }
-
   async function ofrecerEnviarCorreoCargue(r, tt, lineas){
     var correo = (configEmailCache || '').trim();
     if(!lineas.length){ showToast('Este TT no tiene carga registrada.'); return; }
     if(!correo){
-      showToast('No hay correo de aviso configurado. El Admin puede configurarlo en \"Correo para aviso de cargue\".');
+      showToast('No hay correo de aviso configurado. El Admin puede configurarlo en "Correo para aviso de cargue".');
       return;
     }
-    var key = r.id+'|'+tt.codigo;
-    if(correosEnviando[key]) return;          /* evita doble clic */
-    delete correosOk[key]; delete correosErr[key];
-    correosEnviando[key] = true;
-    pintarCorreoBtn(key);
-
+    var ok = await customConfirm('¿Enviar un correo con el resumen del TT# '+tt.codigo+' a '+correo+'?');
+    if(!ok) return;
     var asunto = 'Cargue TT# '+tt.codigo+' - '+r.origen+' a '+r.destino;
     var cuerpo = buildCargueEmailText(r, tt, lineas);
+    showToast('Enviando correo…');
     try{
       await enviarCorreoViaResend(correo, asunto, cuerpo);
+      showToast('Correo enviado a '+correo+'.');
     }catch(e){
       console.error('No se pudo enviar el correo:', e);
-      delete correosEnviando[key];
-      flashCorreo(correosErr, key);
-      showToast('No se pudo enviar el correo: '+String(e && e.message || 'error desconocido').slice(0,140));
-      return;
+      showToast('No se pudo enviar el correo. Revisa que la función de Resend esté publicada.');
     }
-
-    /* Se envió: sumamos 1 al contador del TT (leyendo el dato fresco, así
-       no se pierde la cuenta si alguien más también envía). */
-    var nuevoConteo = null;
-    await mutateRecord(r.id, function(cur){
-      var t = findTT(cur, tt.codigo);
-      if(!t) return {error: 'El TT# '+tt.codigo+' ya no está en esta programación.'};
-      nuevoConteo = Number(t.correos || 0) + 1;
-      var copia = Object.assign({}, t, {correos: nuevoConteo});
-      return {fields: {tts: reemplazarTT(cur, tt.codigo, copia)}};
-    });
-    delete correosEnviando[key];
-    if(nuevoConteo != null){
-      correoBtnsDe(key).forEach(function(b){ b.querySelector('.correo-count').textContent = nuevoConteo; });
-      Array.prototype.forEach.call(document.querySelectorAll('.flag-correo'), function(f){
-        if(f.dataset.key === key){ f.style.display = ''; f.classList.remove('nuevo'); void f.offsetWidth; f.classList.add('nuevo'); }
-      });
-    }
-    flashCorreo(correosOk, key);
   }
 
   async function confirmarCargue(r, ttCodigo){
@@ -2570,7 +2475,7 @@
           cantidad: l.cantidad
         });
       });
-      if(ENVIAR_CORREO_AUTOMATICO) ofrecerEnviarCorreoCargue(r, t0 || {codigo: ttCodigo, operador: '-', cc: '-'}, lineasLog);
+      ofrecerEnviarCorreoCargue(r, t0 || {codigo: ttCodigo, operador: '-', cc: '-'}, lineasLog);
     }
   }
 
@@ -2632,7 +2537,7 @@
       /* Aviso de correo: se dispara con lo que se cargó en ESTA confirmación
          (antes solo pasaba por el flujo viejo "confirmarCargue" y nunca se
          llamaba desde aquí, que es el botón que la app realmente usa). */
-      if(ENVIAR_CORREO_AUTOMATICO) ofrecerEnviarCorreoCargue(r, t0 || {codigo: ttCodigo, operador: '-', cc: '-'}, nuevas);
+      ofrecerEnviarCorreoCargue(r, t0 || {codigo: ttCodigo, operador: '-', cc: '-'}, nuevas);
     }
     return ok;
   }
@@ -2666,38 +2571,6 @@
           items: devolverAItems(cur.items, lineasLog)
         },
         message: 'Carga del TT# '+ttCodigo+' reversada. Las cantidades volvieron a sus BL.'
-      };
-    });
-    if(ok2) logLineas(r, ttCodigo, t0, 'reversar', lineasLog);
-  }
-
-  async function reversarLinea(r, ttCodigo, bl){
-    var t0 = findTT(r, ttCodigo);
-    var lineas0 = t0 ? ttLineas(t0) : [];
-    var linea0 = lineas0.find(function(l){ return l.bl === bl; });
-    var detalle = linea0 ? '\n\nBl '+linea0.bl+' - Cant. '+linea0.cantidad+'\n\nEsa cantidad vuelve al BL.' : '';
-    var ok = await customConfirm('¿Reversar el Bl '+bl+' del TT# '+ttCodigo+'?'+detalle);
-    if(!ok) return;
-    var quienNombre = currentSession ? currentSession.nombre : null;
-    var lineasLog = [];
-    var ok2 = await mutateRecord(r.id, function(cur){
-      var tt = findTT(cur, ttCodigo);
-      if(!tt) return {error: 'El TT# '+ttCodigo+' ya no está en esta programación.'};
-      if(tt.estado !== 'cargado') return {error: 'El TT# '+ttCodigo+' ya no está cargado (alguien más lo actualizó).'};
-      var lineas = ttLineas(tt);
-      var quitada = lineas.filter(function(l){ return l.bl === bl; });
-      if(!quitada.length) return {error: 'Ese Bl ya no está cargado en el TT# '+ttCodigo+'.'};
-      lineasLog = quitada;
-      var quedan = lineas.filter(function(l){ return l.bl !== bl; });
-      var nuevo = quedan.length
-        ? ttNuevo(tt, 'cargado', quedan, quienNombre, 'Reversado')
-        : ttNuevo(tt, 'libre', [], quienNombre, 'Reversado');
-      return {
-        fields: {
-          tts: reemplazarTT(cur, ttCodigo, nuevo),
-          items: devolverAItems(cur.items, quitada)
-        },
-        message: 'Bl '+bl+' reversado del TT# '+ttCodigo+'. La cantidad volvió al BL.'
       };
     });
     if(ok2) logLineas(r, ttCodigo, t0, 'reversar', lineasLog);
@@ -2846,6 +2719,14 @@
 
     head.appendChild(right);
     div.appendChild(head);
+
+    if(!(r.tts||[]).length){
+      var esperaDiv = document.createElement('div');
+      esperaDiv.className = 'empty-inline';
+      esperaDiv.style.cssText = 'background:#fff9e8;color:#8a6100;border:1px solid #f0d998;border-radius:8px;padding:10px 12px;margin-top:6px;';
+      esperaDiv.textContent = 'Esperando a que lleguen los TT. Ya tiene BL programados.';
+      div.appendChild(esperaDiv);
+    }
 
     if((r.tts||[]).length){
       var ttListDiv = document.createElement('div');
@@ -3012,26 +2893,15 @@
       var cargasHtml = '<div class="tt-title"><span>Cargas<span class="tt-count">'+ttsCargados.length+'</span></span></div>';
       ttsCargados.forEach(function(tt){
         var lineasHtml = ttLineas(tt).map(function(l){
-          return '<div class="carga-linea-bl" data-bl="'+esc(l.bl)+'"><span>Bl '+esc(l.bl)+' - Cant. '+esc(l.cantidad)+'</span>'+
-            (opts.editableStatus ? '<button type="button" class="icon-btn btn-reversar-linea" title="Reversar solo este Bl">&times;</button>' : '')+
-          '</div>';
+          return '<div>Bl '+esc(l.bl)+' - Cant. '+esc(l.cantidad)+'</div>';
         }).join('');
         cargasHtml += '<div class="tt-programado-item" data-tt="'+esc(tt.codigo)+'">'+
           '<div class="info carga-lineas"><b>TT# '+esc(tt.codigo)+'</b>'+lineasHtml+
           (tt.ultimoPor ? '<div class="tt-op-meta">Cargado por <b>'+esc(tt.ultimoPor)+'</b></div>' : '')+
-          '<div class="flag-correo" data-key="'+esc(r.id+'|'+tt.codigo)+'"'+(Number(tt.correos||0) > 0 ? '' : ' style="display:none;"')+'>'+
-            '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3.2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12.5l4.5 4.5L19 7.5"/></svg>'+
-            'Correo enviado</div>'+
           '</div>'+
           (opts.editableStatus ?
             '<div class="carga-actions">'+
-              (function(){
-                var kc = r.id+'|'+tt.codigo;
-                var cls = correosEnviando[kc] ? ' enviando' : (correosOk[kc] ? ' ok' : (correosErr[kc] ? ' err' : ''));
-                var txt = correosEnviando[kc] ? 'Enviando…' : (correosOk[kc] ? '¡Enviado!' : (correosErr[kc] ? 'Reintentar' : 'Correo'));
-                return '<button type="button" class="btn secondary btn-sm btn-correo-carga'+cls+'" data-key="'+esc(kc)+'" title="Enviar correo (veces enviado: '+Number(tt.correos||0)+')">'+
-                  '<span class="txt">'+txt+'</span><span class="correo-count">'+Number(tt.correos||0)+'</span></button>';
-              })()+
+              '<button type="button" class="btn secondary btn-sm btn-correo-carga">Correo</button>'+
               '<button type="button" class="btn danger btn-sm btn-reversar">Reversar</button>'+
               '<button type="button" class="btn secondary btn-sm btn-liberar-carga">Liberar</button>'+
             '</div>' : '')+
@@ -3052,11 +2922,6 @@
         cargasDiv.querySelectorAll('.btn-reversar').forEach(function(btn){
           var codigo = btn.closest('.tt-programado-item').dataset.tt;
           btn.addEventListener('click', function(){ reversarCarga(r, codigo); });
-        });
-        cargasDiv.querySelectorAll('.btn-reversar-linea').forEach(function(btn){
-          var codigo = btn.closest('.tt-programado-item').dataset.tt;
-          var bl = btn.closest('.carga-linea-bl').dataset.bl;
-          btn.addEventListener('click', function(e){ e.stopPropagation(); reversarLinea(r, codigo, bl); });
         });
         cargasDiv.querySelectorAll('.btn-liberar-carga').forEach(function(btn){
           var codigo = btn.closest('.tt-programado-item').dataset.tt;
