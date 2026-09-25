@@ -805,9 +805,90 @@
   .rol-badge.administrador{background:#e6f0fb;color:var(--spb-blue-dark);}
   .rol-badge.operativo{background:#fff9e8;color:#8a6100;}
   .rol-badge.ver{background:#eef7f0;color:#1f7a45;}
+  .rol-badge.puerta1{background:#eaf6fc;color:#0a6a99;}
+  .rol-badge.puerta2{background:#f3ecfb;color:#5b2d91;}
+  .rol-badge.cbg3{background:#fdeee3;color:#a1520a;}
 
   ::-webkit-scrollbar{width:9px;height:9px;}
   ::-webkit-scrollbar-thumb{background:var(--line);border-radius:6px;}
+
+  /* =========================================================
+     Camino visual del ciclo: estaciones conectadas, con un
+     camioncito en la etapa actual (Flujo) o todo el trayecto
+     ya completo (Reporte de ciclos).
+  ========================================================= */
+  .ciclo-timeline{
+    display:flex;
+    align-items:flex-start;
+    overflow-x:auto;
+    padding:22px 6px 4px;
+    gap:0;
+  }
+  .ciclo-step{
+    display:flex;
+    flex-direction:column;
+    align-items:center;
+    min-width:70px;
+    flex-shrink:0;
+    position:relative;
+  }
+  .ciclo-step .ciclo-icon{
+    width:36px;height:36px;
+    border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    font-size:17px;
+    background:#f4f6f8;
+    border:2px solid var(--line-strong);
+    color:#9aa7b2;
+    z-index:2;
+    transition:background .2s ease, border-color .2s ease;
+  }
+  .ciclo-step.done .ciclo-icon{background:var(--spb-blue);border-color:var(--spb-blue);color:#fff;}
+  .ciclo-step.current .ciclo-icon{
+    background:#fff9e8;border-color:var(--spb-yellow);color:var(--spb-blue-dark);
+    box-shadow:0 0 0 4px rgba(255,202,8,.22);
+    animation:ciclo-pulso 1.4s ease-in-out infinite;
+  }
+  @keyframes ciclo-pulso{
+    0%,100%{ box-shadow:0 0 0 4px rgba(255,202,8,.22); }
+    50%{ box-shadow:0 0 0 7px rgba(255,202,8,.12); }
+  }
+  .ciclo-step .ciclo-label{font-size:10.5px;font-weight:700;color:var(--ink-soft);margin-top:7px;text-align:center;white-space:nowrap;}
+  .ciclo-step.done .ciclo-label,.ciclo-step.current .ciclo-label{color:var(--spb-blue-dark);}
+  .ciclo-step .ciclo-hora{font-size:10px;color:var(--ink-soft);margin-top:1px;white-space:nowrap;}
+  .ciclo-step .ciclo-persona{font-size:9.5px;color:var(--ink-soft);white-space:nowrap;max-width:80px;overflow:hidden;text-overflow:ellipsis;}
+  .ciclo-connector{
+    flex:1 1 30px;
+    min-width:22px;
+    height:3px;
+    border-radius:3px;
+    background:var(--line-strong);
+    margin-top:18px;
+    position:relative;
+  }
+  .ciclo-connector.done{background:var(--spb-blue);}
+  .ciclo-connector .ciclo-dur{
+    position:absolute;
+    top:-17px;
+    left:50%;
+    transform:translateX(-50%);
+    font-size:9.5px;
+    font-weight:700;
+    color:var(--spb-blue);
+    white-space:nowrap;
+    background:#fff;
+    padding:0 3px;
+  }
+  .ciclo-report-card{
+    border:1px solid var(--line);
+    border-radius:12px;
+    padding:16px 18px 6px;
+    margin-bottom:14px;
+    background:#fff;
+    box-shadow:0 1px 2px rgba(16,40,64,.05);
+  }
+  .ciclo-report-card .rec-head{margin-bottom:0;}
+  .ciclo-report-card .badge.atendido{font-size:12.5px;padding:5px 12px;}
 
   @media (max-width:600px){
     main{padding:14px 10px 90px;}
@@ -896,6 +977,7 @@
     <div class="role-switch" style="margin-bottom:16px;">
       <button id="tabCapturarBtn" class="active" type="button">Programar traslado</button>
       <button id="tabProgramacionesBtn" type="button">Programaciones</button>
+      <button id="tabFlujoAdminBtn" type="button">Flujo</button>
     </div>
 
     <div id="tabCapturarContent">
@@ -999,17 +1081,44 @@
       </div>
     </div>
 
+    <div id="tabFlujoAdminContent" style="display:none;">
+      <div class="panel card-sec sec-tt">
+        <div class="tabs-actions">
+          <button class="btn ghost" id="btnRefreshFlujoAdmin" type="button">Actualizar</button>
+        </div>
+        <h2>Flujo de los TT</h2>
+        <p class="sub">En qué etapa va cada TT, cuánto duró cada paso, y el tiempo total acumulado en el ciclo.</p>
+        <div id="listFlujoAdmin"></div>
+      </div>
+    </div>
+
   </section>
 
   <!-- ================= VISTA OPERATIVO ================= -->
   <section id="viewOp" style="display:none;">
-    <div class="panel card-sec sec-main">
-      <div class="tabs-actions">
-        <button class="btn ghost" id="btnRefreshOp" type="button">Actualizar</button>
+    <div class="role-switch" style="margin-bottom:16px;">
+      <button id="tabOpProgramacionesBtn" class="active" type="button">Programaciones</button>
+      <button id="tabOpFlujoBtn" type="button">Flujo</button>
+    </div>
+    <div id="tabOpProgramacionesContent">
+      <div class="panel card-sec sec-main">
+        <div class="tabs-actions">
+          <button class="btn ghost" id="btnRefreshOp" type="button">Actualizar</button>
+        </div>
+        <h2>Programaciones para hoy</h2>
+        <p class="sub">Estas son las solicitudes enviadas por Administración para programar el ingreso o salida de los TT.</p>
+        <div id="listOp"></div>
       </div>
-      <h2>Programaciones para hoy</h2>
-      <p class="sub">Estas son las solicitudes enviadas por Administración para programar el ingreso o salida de los TT.</p>
-      <div id="listOp"></div>
+    </div>
+    <div id="tabOpFlujoContent" style="display:none;">
+      <div class="panel card-sec sec-tt">
+        <div class="tabs-actions">
+          <button class="btn ghost" id="btnRefreshFlujoOp" type="button">Actualizar</button>
+        </div>
+        <h2>Flujo de los TT</h2>
+        <p class="sub">En qué etapa va cada TT, cuánto duró cada paso, y el tiempo total acumulado en el ciclo.</p>
+        <div id="listFlujoOp"></div>
+      </div>
     </div>
   </section>
 
@@ -1022,6 +1131,58 @@
       <h2>Seguimiento (solo lectura)</h2>
       <p class="sub">Aquí puedes ver en tiempo real lo que va haciendo Operativo. No se puede editar nada desde esta vista.</p>
       <div id="listVer"></div>
+    </div>
+  </section>
+
+  <!-- ================= VISTA PUERTA 1 ================= -->
+  <section id="viewPuerta1" style="display:none;">
+    <div class="panel card-sec sec-tt">
+      <div class="tabs-actions">
+        <button class="btn ghost" id="btnRefreshPuerta1" type="button">Actualizar</button>
+      </div>
+      <h2>Puerta 1 — Salida</h2>
+      <p class="sub">TT ya cargados, listos para salir por Puerta 1.</p>
+      <div id="listPuerta1"></div>
+    </div>
+  </section>
+
+  <!-- ================= VISTA PUERTA 2 ================= -->
+  <section id="viewPuerta2" style="display:none;">
+    <div class="panel card-sec sec-tt">
+      <div class="tabs-actions">
+        <button class="btn ghost" id="btnRefreshPuerta2" type="button">Actualizar</button>
+      </div>
+      <h2>Puerta 2 — Entrada</h2>
+      <p class="sub">TT que ya salieron por Puerta 1, listos para entrar por Puerta 2.</p>
+      <div id="listPuerta2"></div>
+    </div>
+  </section>
+
+  <!-- ================= VISTA CBG3 ================= -->
+  <section id="viewCbg3" style="display:none;">
+    <div class="role-switch" style="margin-bottom:16px;">
+      <button id="tabCbg3ListaBtn" class="active" type="button">CBG3</button>
+      <button id="tabCbg3FlujoBtn" type="button">Flujo</button>
+    </div>
+    <div id="tabCbg3ListaContent">
+      <div class="panel card-sec sec-tt">
+        <div class="tabs-actions">
+          <button class="btn ghost" id="btnRefreshCbg3" type="button">Actualizar</button>
+        </div>
+        <h2>CBG3 — Llegada y descargue</h2>
+        <p class="sub">TT en camino a cobertizo, y TT ya en cobertizo listos para descargar y quedar libres.</p>
+        <div id="listCbg3"></div>
+      </div>
+    </div>
+    <div id="tabCbg3FlujoContent" style="display:none;">
+      <div class="panel card-sec sec-tt">
+        <div class="tabs-actions">
+          <button class="btn ghost" id="btnRefreshFlujoCbg3" type="button">Actualizar</button>
+        </div>
+        <h2>Flujo de los TT</h2>
+        <p class="sub">En qué etapa va cada TT, cuánto duró cada paso, y el tiempo total acumulado en el ciclo.</p>
+        <div id="listFlujoCbg3"></div>
+      </div>
     </div>
   </section>
 
@@ -1056,6 +1217,9 @@
           <select id="uRol">
             <option value="administrador">Administrador</option>
             <option value="operativo">Operativo</option>
+            <option value="puerta1">Puerta 1</option>
+            <option value="puerta2">Puerta 2</option>
+            <option value="cbg3">CBG3 (llegada y libre)</option>
             <option value="ver">Ver (solo lectura)</option>
             <option value="admin">Admin (gestiona usuarios)</option>
           </select>
@@ -1075,6 +1239,30 @@
       <h3 class="card-title">Usuarios <span class="tt-count" id="usuariosCount">0</span></h3>
       <div id="usuariosList" class="empty-inline">Aún no hay usuarios.</div>
       </div>
+      </div>
+    </div>
+
+    <div class="panel card-sec sec-tt collapsible collapsed">
+      <div class="collapsible-title" id="estacionesToggle" style="margin-bottom:5px;">
+        <h2 style="margin:0;">Estaciones del flujo (Puerta 1 / Puerta 2)</h2>
+        <span class="chevron">&#9662;</span>
+      </div>
+      <div class="collapsible-content">
+      <p class="sub">Si apagas una estación, el sistema se la salta sola: el TT pasa directo de la anterior a la siguiente estación activa, sin necesitar que nadie la marque.</p>
+      <div class="grid2">
+        <div class="field" style="display:flex;align-items:center;gap:10px;margin-bottom:0;">
+          <input type="checkbox" id="chkPuerta1Activa" style="width:auto;" checked>
+          <label style="margin:0;" for="chkPuerta1Activa">Puerta 1 activa</label>
+        </div>
+        <div class="field" style="display:flex;align-items:center;gap:10px;margin-bottom:0;">
+          <input type="checkbox" id="chkPuerta2Activa" style="width:auto;" checked>
+          <label style="margin:0;" for="chkPuerta2Activa">Puerta 2 activa</label>
+        </div>
+      </div>
+      <div class="btn-row">
+        <button class="btn" id="btnGuardarEstaciones" type="button">Guardar</button>
+      </div>
+      <p class="empty-inline" id="estacionesEstado"></p>
       </div>
     </div>
 
@@ -1110,6 +1298,35 @@
       <h2>Traslados</h2>
       <p class="sub">Consulta cómo va cada traslado (TT, BL, cargas), edítalo o elimínalo si es necesario.</p>
       <div id="listAdminTraslados"></div>
+    </div>
+
+    <div class="panel card-sec sec-tt">
+      <div class="tabs-actions">
+        <button class="btn ghost" id="btnRefreshFlujoGestion" type="button">Actualizar</button>
+      </div>
+      <h2>Flujo de los TT</h2>
+      <p class="sub">En qué etapa va cada TT, cuánto duró cada paso, y el tiempo total acumulado en el ciclo.</p>
+      <div id="listFlujoGestion"></div>
+    </div>
+
+    <div class="panel card-sec sec-tt">
+      <h2>Reporte de ciclos completados</h2>
+      <p class="sub">Reconstruye el ciclo completo de cada TT (Cargado → ... → Libre/Reversado) con la hora de cada etapa y el tiempo total. Elige una fecha para consultar; puedes filtrar por TT si quieres.</p>
+      <div class="grid3">
+        <div class="field">
+          <label>Fecha</label>
+          <input type="date" id="fCicloFecha">
+        </div>
+        <div class="field">
+          <label>TT # (opcional)</label>
+          <input type="text" id="fCicloTT" inputmode="numeric" placeholder="ej. 45">
+        </div>
+        <div class="field">
+          <label>&nbsp;</label>
+          <button class="btn" id="btnBuscarCiclos" type="button">Buscar</button>
+        </div>
+      </div>
+      <div id="listCiclos" class="empty-inline">Elige una fecha y dale "Buscar".</div>
     </div>
 
     <div class="panel card-sec sec-user">
@@ -2231,9 +2448,291 @@
     return ttLineas(tt).map(function(l){ return 'Bl '+l.bl+' - Cant. '+l.cantidad; }).join(', ');
   }
   function ttNuevo(t, estado, cargas, quien, accion){
+    var etapa = t.etapa || null;
+    var tiempos = Object.assign({}, t.tiempos || {});
+    if(estado === 'libre'){
+      etapa = null;
+      tiempos = {};
+    }else if(estado === 'cargado' && t.estado !== 'cargado'){
+      etapa = 'cargado';
+      tiempos.cargado = Date.now();
+    }
     return {codigo: t.codigo, operador: t.operador, cc: t.cc, estado: estado, cargas: cargas,
-            ultimoPor: quien, ultimaAccion: accion};
+            ultimoPor: quien, ultimaAccion: accion, etapa: etapa, tiempos: tiempos};
   }
+
+  /* Avanza un TT cargado a la siguiente estación (Sale Puerta 1, Entra
+     Puerta 2, Llegada a Cobertizo), guardando la hora exacta.
+     "etapaRequerida" es la etapa anterior obligatoria: si no coincide,
+     se rechaza (nadie puede saltarse un puesto). */
+  async function avanzarEtapa(r, ttCodigo, etapaNueva, etapaRequerida, accionLabel){
+    var quienNombre = currentSession ? currentSession.nombre : null;
+    var ok = await mutateRecord(r.id, function(cur){
+      var tt = findTT(cur, ttCodigo);
+      if(!tt) return {error: 'El TT# '+ttCodigo+' ya no está en esta programación.'};
+      if(tt.estado !== 'cargado') return {error: 'El TT# '+ttCodigo+' no está cargado.'};
+      var etapaActual = tt.etapa || null;
+      if(etapaActual !== etapaRequerida){
+        var faltaLabel = ETAPAS_LABEL[etapaRequerida] || etapaRequerida;
+        return {error: 'El TT# '+ttCodigo+' todavía no tiene registrado "'+faltaLabel+'". No se puede saltar ese paso.'};
+      }
+      var tiempos = Object.assign({}, tt.tiempos || {});
+      tiempos[etapaNueva] = Date.now();
+      var nuevo = {
+        codigo: tt.codigo, operador: tt.operador, cc: tt.cc, estado: tt.estado, cargas: tt.cargas,
+        ultimoPor: quienNombre, ultimaAccion: accionLabel,
+        etapa: etapaNueva, tiempos: tiempos
+      };
+      return {
+        fields: {tts: reemplazarTT(cur, ttCodigo, nuevo)},
+        message: 'TT# '+ttCodigo+': '+accionLabel+'.'
+      };
+    });
+    if(ok){
+      logMovimiento({
+        accion: etapaNueva, programacion_id: r.id, origen: r.origen, destino: r.destino,
+        tt_codigo: ttCodigo
+      });
+    }
+    return ok;
+  }
+  function marcarSalePuerta1(r, ttCodigo){ return avanzarEtapa(r, ttCodigo, 'sale_puerta1', etapaRequeridaPara('sale_puerta1'), 'Salió Puerta 1'); }
+  function marcarEntraPuerta2(r, ttCodigo){ return avanzarEtapa(r, ttCodigo, 'entra_puerta2', etapaRequeridaPara('entra_puerta2'), 'Entró Puerta 2'); }
+  function marcarLlegadaCobertizo(r, ttCodigo){ return avanzarEtapa(r, ttCodigo, 'llegada_cobertizo', etapaRequeridaPara('llegada_cobertizo'), 'Llegó a Cobertizo'); }
+
+  /* Texto con la hora de cada estación y cuánto tardó entre una y la siguiente */
+  var ETAPAS_ORDEN = ['cargado','sale_puerta1','entra_puerta2','llegada_cobertizo','libre'];
+  var ETAPAS_LABEL = {cargado:'Cargado', sale_puerta1:'Salió P1', entra_puerta2:'Entró P2', llegada_cobertizo:'Llegó cobertizo', libre:'Libre'};
+  function fmtHora(ts){
+    var d = new Date(ts);
+    return pad(d.getHours())+':'+pad(d.getMinutes());
+  }
+  function fmtDuracion(msIni, msFin){
+    var mins = Math.round((msFin - msIni) / 60000);
+    if(mins < 1) return '<1 min';
+    if(mins < 60) return mins + ' min';
+    var h = Math.floor(mins / 60), m = mins % 60;
+    return h + 'h' + (m ? ' ' + m + 'min' : '');
+  }
+  function renderTiemposTexto(tt){
+    var tiempos = tt.tiempos || {};
+    var partes = [], anteriorTs = null;
+    ETAPAS_ORDEN.forEach(function(et){
+      var ts = tiempos[et];
+      if(!ts) return;
+      var txt = ETAPAS_LABEL[et] + ' ' + fmtHora(ts);
+      if(anteriorTs) txt += ' (+' + fmtDuracion(anteriorTs, ts) + ')';
+      partes.push(txt);
+      anteriorTs = ts;
+    });
+    return partes.join(' &middot; ');
+  }
+
+  /* Lista genérica para las pantallas de Puerta 1 / Puerta 2 / CBG3:
+     muestra los TT que están exactamente en la etapa que le corresponde
+     marcar a ese puesto, con un botón para avanzar a la siguiente. */
+  function renderEstacionList(container, criterios){
+    container.innerHTML = '';
+    var filas = [];
+    (lastRecords || []).forEach(function(r){
+      (r.tts || []).forEach(function(tt){
+        if(tt.estado !== 'cargado') return;
+        var etapaActual = tt.etapa || 'cargado';
+        criterios.forEach(function(c){
+          if(etapaActual === c.etapaActual) filas.push({r: r, tt: tt, criterio: c});
+        });
+      });
+    });
+    if(!filas.length){
+      var empty = document.createElement('div');
+      empty.className = 'empty';
+      empty.innerHTML = '<div class="big">&#9989;</div>No hay TT pendientes en este puesto por ahora.';
+      container.appendChild(empty);
+      return;
+    }
+    filas.forEach(function(f){
+      var div = document.createElement('div');
+      div.className = 'rec-card';
+      div.innerHTML =
+        '<div class="rec-head">'+
+          '<div>'+
+            '<div class="route">TT# '+esc(f.tt.codigo)+' &middot; '+esc(f.tt.operador)+' &middot; CC '+esc(f.tt.cc)+'</div>'+
+            '<div class="meta">'+esc(f.r.origen)+' &rarr; '+esc(f.r.destino)+'</div>'+
+          '</div>'+
+        '</div>'+
+        '<div class="tt-op-meta" style="margin-bottom:10px;">'+renderTiemposTexto(f.tt)+'</div>'+
+        '<div class="btn-row" style="margin-top:0;"><button type="button" class="btn btn-sm btn-accion-estacion">'+esc(f.criterio.label)+'</button></div>';
+      div.querySelector('.btn-accion-estacion').addEventListener('click', function(){
+        f.criterio.accion(f.r, f.tt.codigo);
+      });
+      container.appendChild(div);
+    });
+  }
+
+  function mostrarEstacionDeshabilitada(container, nombre){
+    container.innerHTML =
+      '<div class="empty"><div class="big">&#128683;</div>'+
+      esc(nombre)+' está desactivada por el Admin. El sistema salta esta estación sola.</div>';
+  }
+
+  function refreshEstaciones(){
+    var listP1 = document.getElementById('listPuerta1');
+    var listP2 = document.getElementById('listPuerta2');
+    if(estacionesConfig.puerta1 === false){
+      mostrarEstacionDeshabilitada(listP1, 'Puerta 1');
+    }else{
+      renderEstacionList(listP1, [
+        {etapaActual: 'cargado', label: 'Sale Puerta 1', accion: marcarSalePuerta1}
+      ]);
+    }
+    if(estacionesConfig.puerta2 === false){
+      mostrarEstacionDeshabilitada(listP2, 'Puerta 2');
+    }else{
+      renderEstacionList(listP2, [
+        {etapaActual: etapaRequeridaPara('entra_puerta2'), label: 'Entra Puerta 2', accion: marcarEntraPuerta2}
+      ]);
+    }
+    renderEstacionList(document.getElementById('listCbg3'), [
+      {etapaActual: etapaRequeridaPara('llegada_cobertizo'), label: 'Llegada a Cobertizo', accion: marcarLlegadaCobertizo},
+      {etapaActual: 'llegada_cobertizo', label: 'TT Libre (descargado)', accion: liberarDesdeCobertizo}
+    ]);
+  }
+
+  document.getElementById('btnRefreshPuerta1').addEventListener('click', function(){ refreshEstaciones(); showToast('Actualizado.'); });
+  document.getElementById('btnRefreshPuerta2').addEventListener('click', function(){ refreshEstaciones(); showToast('Actualizado.'); });
+  document.getElementById('btnRefreshCbg3').addEventListener('click', function(){ refreshEstaciones(); showToast('Actualizado.'); });
+
+  /* ---------------------------------------------------------
+     Pestaña "Flujo": cómo va cada TT que está en ciclo ahora
+     mismo (ya cargado y todavía no liberado), en qué etapa
+     está, cuánto duró cada paso, y el total acumulado hasta
+     este momento. La ven Operativo, CBG3, Administrador y Admin.
+  --------------------------------------------------------- */
+  var ETAPA_ACTUAL_LABEL = {
+    cargado: 'Cargado, esperando salir por Puerta 1',
+    sale_puerta1: 'Salió Puerta 1, esperando entrar por Puerta 2',
+    entra_puerta2: 'Entró Puerta 2, en camino a Cobertizo',
+    llegada_cobertizo: 'En Cobertizo, esperando descargue'
+  };
+
+  /* Pasos posibles del camino visual. Puerta 1 / Puerta 2 se omiten
+     solas si están desactivadas en la configuración de Estaciones. */
+  function pasosVisiblesDelCamino(){
+    var pasos = [{key:'cargado', label:'Cargado', icon:'&#128230;'}];
+    if(estacionesConfig.puerta1 !== false) pasos.push({key:'sale_puerta1', label:'Puerta 1', icon:'&#128682;'});
+    if(estacionesConfig.puerta2 !== false) pasos.push({key:'entra_puerta2', label:'Puerta 2', icon:'&#128682;'});
+    pasos.push({key:'llegada_cobertizo', label:'Cobertizo', icon:'&#127981;'});
+    pasos.push({key:'fin', label:'Libre', icon:'&#127937;'});
+    return pasos;
+  }
+
+  /* Construye el HTML del camino visual.
+     tiempos: {cargado, sale_puerta1, entra_puerta2, llegada_cobertizo, fin} -> hora ya formateada, o null si aún no pasa.
+     personas: lo mismo pero con el nombre de quién marcó cada paso (opcional).
+     etapaActualKey: para el modo "en vivo" (Flujo), cuál paso mostrar con el camioncito 🚚. null si el ciclo ya terminó (reporte). */
+  function buildCicloTimeline(tiempos, personas, etapaActualKey, pasosOverride){
+    var pasos = pasosOverride || pasosVisiblesDelCamino();
+    var html = '<div class="ciclo-timeline">';
+    pasos.forEach(function(p, idx){
+      var hora = tiempos[p.key];
+      var esActual = etapaActualKey && p.key === etapaActualKey;
+      var estado = hora ? 'done' : (esActual ? 'current' : 'pending');
+      var icono = esActual ? '&#128666;' : p.icon; /* 🚚 en la etapa actual */
+      html += '<div class="ciclo-step '+estado+'">'+
+        '<div class="ciclo-icon">'+icono+'</div>'+
+        '<div class="ciclo-label">'+esc(p.label)+'</div>'+
+        (hora ? '<div class="ciclo-hora">'+esc(hora)+'</div>' : (esActual ? '<div class="ciclo-hora">en curso…</div>' : ''))+
+        (personas && personas[p.key] ? '<div class="ciclo-persona">'+esc(personas[p.key])+'</div>' : '')+
+      '</div>';
+      if(idx < pasos.length - 1){
+        var next = pasos[idx+1];
+        var conectorDone = !!(hora && tiempos[next.key]);
+        var dur = (hora && tiempos[next.key]) ? tiempos['dur_'+next.key] : null;
+        html += '<div class="ciclo-connector'+(conectorDone ? ' done' : '')+'">'+
+          (dur ? '<div class="ciclo-dur">'+esc(dur)+'</div>' : '')+
+        '</div>';
+      }
+    });
+    html += '</div>';
+    return html;
+  }
+
+  function renderFlujo(container){
+    if(!container) return;
+    container.innerHTML = '';
+    var filas = [];
+    (lastRecords || []).forEach(function(r){
+      (r.tts || []).forEach(function(tt){
+        if(tt.estado === 'cargado') filas.push({r: r, tt: tt});
+      });
+    });
+    if(!filas.length){
+      var empty = document.createElement('div');
+      empty.className = 'empty';
+      empty.innerHTML = '<div class="big">&#128663;</div>No hay ningún TT en ciclo en este momento.';
+      container.appendChild(empty);
+      return;
+    }
+    filas.sort(function(a, b){
+      var ta = (a.tt.tiempos && a.tt.tiempos.cargado) || 0;
+      var tb = (b.tt.tiempos && b.tt.tiempos.cargado) || 0;
+      return ta - tb;
+    });
+    filas.forEach(function(f){
+      var tt = f.tt, r = f.r;
+      var etapa = tt.etapa || 'cargado';
+      var tp = tt.tiempos || {};
+      var inicio = tp.cargado || null;
+      var totalTxt = inicio ? fmtDuracion(inicio, Date.now()) : '—';
+
+      var tiemposFmt = {};
+      var anterior = null;
+      ['cargado','sale_puerta1','entra_puerta2','llegada_cobertizo'].forEach(function(k){
+        if(tp[k]){
+          tiemposFmt[k] = fmtHora(tp[k]);
+          if(anterior) tiemposFmt['dur_'+k] = fmtDuracion(anterior, tp[k]);
+          anterior = tp[k];
+        }
+      });
+      /* "Siguiente paso esperado": el primero de la lista visible que todavía no tiene hora */
+      var pasosVis = pasosVisiblesDelCamino();
+      var siguienteKey = null;
+      for(var i = 0; i < pasosVis.length; i++){
+        if(pasosVis[i].key !== 'fin' && !tiemposFmt[pasosVis[i].key]){ siguienteKey = pasosVis[i].key; break; }
+      }
+      if(!siguienteKey) siguienteKey = 'fin'; /* ya pasó cobertizo: falta liberarlo */
+
+      var div = document.createElement('div');
+      div.className = 'rec-card';
+      div.innerHTML =
+        '<div class="rec-head">'+
+          '<div>'+
+            '<div class="route">TT# '+esc(tt.codigo)+' &middot; '+esc(tt.operador)+' &middot; CC '+esc(tt.cc)+'</div>'+
+            '<div class="meta">'+esc(r.origen)+' &rarr; '+esc(r.destino)+'</div>'+
+          '</div>'+
+          '<span class="badge programado">'+esc(ETAPA_ACTUAL_LABEL[etapa] || etapa)+'</span>'+
+        '</div>'+
+        buildCicloTimeline(tiemposFmt, null, siguienteKey)+
+        '<div style="font-size:13.5px;padding:0 6px 4px;"><b>Tiempo total en el ciclo hasta ahora:</b> '+esc(totalTxt)+'</div>';
+      container.appendChild(div);
+    });
+  }
+
+  function renderAllFlujos(){
+    renderFlujo(document.getElementById('listFlujoOp'));
+    renderFlujo(document.getElementById('listFlujoCbg3'));
+    renderFlujo(document.getElementById('listFlujoAdmin'));
+    renderFlujo(document.getElementById('listFlujoGestion'));
+  }
+
+  /* El "tiempo total" debe seguir subiendo aunque nadie marque nada nuevo */
+  setInterval(function(){ if(typeof renderAllFlujos === 'function') renderAllFlujos(); }, 30000);
+
+  ['btnRefreshFlujoOp','btnRefreshFlujoCbg3','btnRefreshFlujoAdmin','btnRefreshFlujoGestion'].forEach(function(id){
+    var btn = document.getElementById(id);
+    if(btn) btn.addEventListener('click', function(){ renderAllFlujos(); showToast('Actualizado.'); });
+  });
+
   function devolverAItems(items, lineas){
     return (items||[]).map(function(it){
       var suma = lineas.filter(function(l){ return l.bl === it.bl; })
@@ -2245,49 +2744,6 @@
   }
   function reemplazarTT(cur, ttCodigo, nuevo){
     return (cur.tts||[]).map(function(t){ return t.codigo === ttCodigo ? nuevo : t; });
-  }
-
-  async function quitarLinea(r, ttCodigo, bl){
-    var quienNombre = currentSession ? currentSession.nombre : null;
-    return mutateRecord(r.id, function(cur){
-      var tt = findTT(cur, ttCodigo);
-      if(!tt) return {error: 'El TT# '+ttCodigo+' ya no está en esta programación.'};
-      if(tt.estado !== 'cargando') return {error: 'El cargue del TT# '+ttCodigo+' ya no está en curso (alguien más lo actualizó).'};
-      var lineas = ttLineas(tt);
-      var quitada = lineas.filter(function(l){ return l.bl === bl; });
-      if(!quitada.length) return {error: 'Ese BL ya no está en el cargue del TT# '+ttCodigo+'.'};
-      var quedan = lineas.filter(function(l){ return l.bl !== bl; });
-      var nuevo = quedan.length
-        ? ttNuevo(tt, 'cargando', quedan, quienNombre, 'En cargue')
-        : ttNuevo(tt, 'libre', [], quienNombre, 'Cargue cancelado');
-      return {
-        fields: {
-          tts: reemplazarTT(cur, ttCodigo, nuevo),
-          items: devolverAItems(cur.items, quitada)
-        },
-        message: 'Bl '+bl+' quitado del TT# '+ttCodigo+'. La cantidad volvió al BL.'
-      };
-    });
-  }
-
-  async function cancelarCargue(r, ttCodigo){
-    var t0 = findTT(r, ttCodigo);
-    var ok = await customConfirm('¿Cancelar el cargue en curso del TT# '+ttCodigo+'?\n\n'+
-      (t0 ? ttResumen(t0)+'\n\n' : '')+'Las cantidades vuelven a sus BL.');
-    if(!ok) return;
-    var quienNombre = currentSession ? currentSession.nombre : null;
-    await mutateRecord(r.id, function(cur){
-      var tt = findTT(cur, ttCodigo);
-      if(!tt) return {error: 'El TT# '+ttCodigo+' ya no está en esta programación.'};
-      if(tt.estado !== 'cargando') return {error: 'El cargue del TT# '+ttCodigo+' ya no está en curso (alguien más lo actualizó).'};
-      return {
-        fields: {
-          tts: reemplazarTT(cur, ttCodigo, ttNuevo(tt, 'libre', [], quienNombre, 'Cargue cancelado')),
-          items: devolverAItems(cur.items, ttLineas(tt))
-        },
-        message: 'Cargue del TT# '+ttCodigo+' cancelado. Las cantidades volvieron a sus BL.'
-      };
-    });
   }
 
   var CONFIG_TABLE = 'configuracion';
@@ -2387,6 +2843,91 @@
     }
   }
 
+  /* ---------------------------------------------------------
+     Estaciones del flujo: Puerta 1 y Puerta 2 se pueden apagar.
+     Cuando una está apagada, el sistema salta directo a la
+     siguiente estación activa (sin pedirle a nadie que la marque).
+  --------------------------------------------------------- */
+  var CONFIG_ESTACIONES_ID = 'estaciones';
+  var estacionesConfig = {puerta1: true, puerta2: true};
+
+  function loadEstacionesLocal(){
+    try{
+      var raw = localStorage.getItem('spb_estaciones_config');
+      return raw ? JSON.parse(raw) : {puerta1: true, puerta2: true};
+    }catch(e){ return {puerta1: true, puerta2: true}; }
+  }
+  function saveEstacionesLocal(cfg){
+    try{ localStorage.setItem('spb_estaciones_config', JSON.stringify(cfg)); }catch(e){}
+  }
+  function pintarEstacionesUI(){
+    var c1 = document.getElementById('chkPuerta1Activa');
+    var c2 = document.getElementById('chkPuerta2Activa');
+    if(c1) c1.checked = estacionesConfig.puerta1 !== false;
+    if(c2) c2.checked = estacionesConfig.puerta2 !== false;
+  }
+
+  /* Dado el nombre de la etapa a la que se quiere avanzar, calcula cuál
+     etapa anterior es realmente obligatoria, saltándose las estaciones
+     que estén apagadas. */
+  function etapaRequeridaPara(etapaNueva){
+    if(etapaNueva === 'sale_puerta1') return 'cargado';
+    if(etapaNueva === 'entra_puerta2') return estacionesConfig.puerta1 !== false ? 'sale_puerta1' : 'cargado';
+    if(etapaNueva === 'llegada_cobertizo'){
+      if(estacionesConfig.puerta2 !== false) return 'entra_puerta2';
+      if(estacionesConfig.puerta1 !== false) return 'sale_puerta1';
+      return 'cargado';
+    }
+    return 'cargado';
+  }
+
+  async function initConfigEstaciones(){
+    estacionesConfig = loadEstacionesLocal();
+    pintarEstacionesUI();
+    if(!db) return;
+    try{
+      db.collection(CONFIG_TABLE).onSnapshot(function(snap){
+        var doc = (snap.docs || []).find(function(d){ return d.id === CONFIG_ESTACIONES_ID; });
+        if(!doc) return;
+        var data = doc.data();
+        if(!data) return;
+        estacionesConfig = {
+          puerta1: data.puerta1 !== false,
+          puerta2: data.puerta2 !== false
+        };
+        saveEstacionesLocal(estacionesConfig);
+        pintarEstacionesUI();
+        if(typeof refreshEstaciones === 'function') refreshEstaciones();
+      }, function(err){
+        console.warn('No se pudo sincronizar la configuración de estaciones:', err);
+      });
+    }catch(e){ console.warn('Error suscribiendo la configuración de estaciones:', e); }
+  }
+
+  async function guardarEstaciones(){
+    var c1 = document.getElementById('chkPuerta1Activa').checked;
+    var c2 = document.getElementById('chkPuerta2Activa').checked;
+    var estado = document.getElementById('estacionesEstado');
+    estacionesConfig = {puerta1: c1, puerta2: c2};
+    saveEstacionesLocal(estacionesConfig);
+    if(typeof refreshEstaciones === 'function') refreshEstaciones();
+    if(!db){
+      if(estado) estado.textContent = 'Guardado en este dispositivo.';
+      showToast('Configuración guardada en este dispositivo.');
+      return;
+    }
+    try{
+      await db.collection(CONFIG_TABLE).doc(CONFIG_ESTACIONES_ID).set({puerta1: c1, puerta2: c2});
+      if(estado) estado.textContent = 'Guardado: se usará en todos los dispositivos.';
+      showToast('Configuración de estaciones guardada.');
+    }catch(e){
+      console.error('No se pudo guardar la configuración de estaciones en Supabase:', e);
+      if(estado) estado.textContent = 'Guardado solo en este dispositivo.';
+      showToast('Guardado en este dispositivo. No se pudo sincronizar.');
+    }
+  }
+  document.getElementById('btnGuardarEstaciones').addEventListener('click', guardarEstaciones);
+
   /* Envía el correo de verdad, a través de la Edge Function de Supabase
      (que a su vez habla con Resend). La llave de Resend nunca está en
      este archivo ni en el navegador. */
@@ -2442,40 +2983,6 @@
     }catch(e){
       console.error('No se pudo enviar el correo:', e);
       showToast('No se pudo enviar el correo. Revisa que la función de Resend esté publicada.');
-    }
-  }
-
-  async function confirmarCargue(r, ttCodigo){
-    var t0 = findTT(r, ttCodigo);
-    var quienNombre = currentSession ? currentSession.nombre : null;
-    var lineasLog = [];
-    var ok = await mutateRecord(r.id, function(cur){
-      var tt = findTT(cur, ttCodigo);
-      if(!tt) return {error: 'El TT# '+ttCodigo+' ya no está en esta programación.'};
-      if(tt.estado === 'cargado') return {error: 'El TT# '+ttCodigo+' ya tiene el cargue confirmado.'};
-      var lineas = ttLineas(tt);
-      if(tt.estado !== 'cargando' || !lineas.length) return {error: 'Primero agrega al menos un BL con su cantidad al TT# '+ttCodigo+'.'};
-      lineasLog = lineas;
-      return {
-        fields: {tts: reemplazarTT(cur, ttCodigo, ttNuevo(tt, 'cargado', lineas, quienNombre, 'Cargado'))},
-        message: 'TT# '+ttCodigo+' cargado: '+lineas.map(function(l){ return 'Bl '+l.bl+' ('+l.cantidad+')'; }).join(' + ')+'.'
-      };
-    });
-    if(ok){
-      lineasLog.forEach(function(l){
-        logMovimiento({
-          accion: 'cargar',
-          programacion_id: r.id,
-          origen: r.origen,
-          destino: r.destino,
-          tt_codigo: ttCodigo,
-          tt_operador: t0 ? t0.operador : null,
-          tt_cc: t0 ? t0.cc : null,
-          bl: l.bl,
-          cantidad: l.cantidad
-        });
-      });
-      ofrecerEnviarCorreoCargue(r, t0 || {codigo: ttCodigo, operador: '-', cc: '-'}, lineasLog);
     }
   }
 
@@ -2574,6 +3081,39 @@
       };
     });
     if(ok2) logLineas(r, ttCodigo, t0, 'reversar', lineasLog);
+  }
+
+  /* "TT Libre" pero solo para CBG3: exige que ya se haya marcado la
+     llegada a cobertizo. El botón "Liberar" normal de la tarjeta de
+     Cargas (para correcciones) sigue sin esta exigencia. */
+  async function liberarDesdeCobertizo(r, ttCodigo){
+    var t0 = findTT(r, ttCodigo);
+    if(!t0 || (t0.etapa || null) !== 'llegada_cobertizo'){
+      showToast('El TT# '+ttCodigo+' todavía no tiene registrada la "Llegada a Cobertizo". No se puede liberar desde aquí.');
+      return;
+    }
+    var lineas0 = t0 ? ttLineas(t0) : [];
+    var detalle = lineas0.length ? '\n\n'+ttResumen(t0)+'\n\nEsas cantidades NO vuelven a los BL.' : '';
+    var ok = await customConfirm('¿Descargar y liberar el TT# '+ttCodigo+'?'+detalle);
+    if(!ok) return;
+    var quienNombre = currentSession ? currentSession.nombre : null;
+    var lineasLog = [];
+    var ok2 = await mutateRecord(r.id, function(cur){
+      var tt = findTT(cur, ttCodigo);
+      if(!tt) return {error: 'El TT# '+ttCodigo+' ya no está en esta programación.'};
+      if(tt.estado !== 'cargado') return {error: 'El TT# '+ttCodigo+' ya no está cargado (alguien más lo actualizó).'};
+      if((tt.etapa || null) !== 'llegada_cobertizo'){
+        return {error: 'El TT# '+ttCodigo+' todavía no tiene registrada la "Llegada a Cobertizo".'};
+      }
+      lineasLog = ttLineas(tt);
+      return {
+        fields: {tts: reemplazarTT(cur, ttCodigo, ttNuevo(tt, 'libre', [], quienNombre, 'TT Libre (descargado en CBG3)'))},
+        message: 'TT# '+ttCodigo+' descargado y liberado. Las cantidades no vuelven a los BL.'
+      };
+    });
+    if(ok2){
+      logLineas(r, ttCodigo, t0, 'tt_libre', lineasLog);
+    }
   }
 
   async function liberarCarga(r, ttCodigo){
@@ -2743,6 +3283,7 @@
             : (tt.estado === 'cargando' ? ' &middot; <span class="badge cargando">En cargue</span>'
             : ' &middot; <span class="badge libre-badge">Libre</span>'))+
           (tt.ultimoPor ? '<div class="tt-op-meta">'+esc(tt.ultimaAccion||'Movimiento')+' por <b>'+esc(tt.ultimoPor)+'</b></div>' : '')+
+          (cargado && tt.tiempos && Object.keys(tt.tiempos).length ? '<div class="tt-op-meta">'+renderTiemposTexto(tt)+'</div>' : '')+
           '</div>';
         if(opts.editableStatus){
           ttHtml += '<div class="tt-op-actions" data-tt="'+esc(tt.codigo)+'">'+
@@ -2839,49 +3380,6 @@
               if(previos[row.dataset.bl] && !inp.value) inp.value = previos[row.dataset.bl];
             });
           });
-        });
-      }
-    }
-
-    var ttsEnCargue = (r.tts||[]).filter(function(tt){ return tt.estado === 'cargando'; });
-    if(ttsEnCargue.length){
-      var enDiv = document.createElement('div');
-      enDiv.className = 'rec-tt rec-sec sec-encargue';
-      var enHtml = '<div class="tt-title"><span>Cargue en curso<span class="tt-count">'+ttsEnCargue.length+'</span></span></div>';
-      ttsEnCargue.forEach(function(tt){
-        var lineas = ttLineas(tt);
-        enHtml += '<div class="cargue-item" data-tt="'+esc(tt.codigo)+'">'+
-          '<div class="cargue-head"><b>TT# '+esc(tt.codigo)+'</b> &middot; '+esc(tt.operador)+
-          (tt.ultimoPor ? '<div class="tt-op-meta">Última actualización por <b>'+esc(tt.ultimoPor)+'</b></div>' : '')+'</div>';
-        lineas.forEach(function(l){
-          enHtml += '<div class="cargue-linea" data-bl="'+esc(l.bl)+'"><span>Bl '+esc(l.bl)+' - Cant. '+esc(l.cantidad)+'</span>'+
-            (opts.editableStatus ? '<button type="button" class="icon-btn btn-quitar-linea" title="Quitar este BL del cargue">&times;</button>' : '')+
-          '</div>';
-        });
-        if(opts.editableStatus){
-          enHtml += '<div class="cargue-actions">'+
-            '<button type="button" class="btn btn-sm btn-confirmar-cargue">Confirmar cargue</button>'+
-            '<button type="button" class="btn ghost btn-sm btn-cancelar-cargue">Cancelar cargue</button>'+
-          '</div>';
-        }
-        enHtml += '</div>';
-      });
-      enDiv.innerHTML = enHtml;
-      div.appendChild(enDiv);
-
-      if(opts.editableStatus){
-        enDiv.querySelectorAll('.btn-confirmar-cargue').forEach(function(btn){
-          var codigo = btn.closest('.cargue-item').dataset.tt;
-          btn.addEventListener('click', function(){ confirmarCargue(r, codigo); });
-        });
-        enDiv.querySelectorAll('.btn-cancelar-cargue').forEach(function(btn){
-          var codigo = btn.closest('.cargue-item').dataset.tt;
-          btn.addEventListener('click', function(){ cancelarCargue(r, codigo); });
-        });
-        enDiv.querySelectorAll('.btn-quitar-linea').forEach(function(btn){
-          var codigo = btn.closest('.cargue-item').dataset.tt;
-          var bl = btn.closest('.cargue-linea').dataset.bl;
-          btn.addEventListener('click', function(){ quitarLinea(r, codigo, bl); });
         });
       }
     }
@@ -3040,6 +3538,8 @@
     renderList(listVerEl, records, {deletable:false, editableStatus:false});
     renderList(listAdministradorProgEl, records, {deletable:false, editableStatus:false});
     renderList(listAdminTrasladosEl, records, {deletable:true, editableStatus:false, editableRoute:true});
+    if(typeof refreshEstaciones === 'function') refreshEstaciones();
+    if(typeof renderAllFlujos === 'function') renderAllFlujos();
     restoreCargaState(saved);
   }
 
@@ -3062,7 +3562,9 @@
       return;
     }
     el.className = '';
-    var ACCION_LABEL = {cargar:'Cargó', reversar:'Reversó', liberar:'Liberó', quitar_tt:'Quitó TT'};
+    var ACCION_LABEL = {cargar:'Cargó', reversar:'Reversó', liberar:'Liberó', quitar_tt:'Quitó TT',
+      sale_puerta1:'Salió Puerta 1', entra_puerta2:'Entró Puerta 2', llegada_cobertizo:'Llegó a Cobertizo',
+      tt_libre:'TT Libre (CBG3)'};
     var table = document.createElement('table');
     table.className = 'items';
     var thead = '<thead><tr><th>Hora</th><th>Acción</th><th>TT</th><th>Bl</th><th>Cant.</th><th>Realizado por</th><th>Ruta</th></tr></thead>';
@@ -3112,6 +3614,139 @@
   }
   document.getElementById('btnBuscarDespachos').addEventListener('click', buscarDespachos);
 
+  /* ---------------------------------------------------------
+     Reporte de ciclos completados: junta las filas del historial
+     de movimientos de cada TT y arma su ciclo completo
+     (Cargado -> Sale P1 -> Entra P2 -> Llegada Cobertizo -> Fin).
+     Un TT puede tener varios ciclos el mismo día si se cargó y
+     liberó más de una vez.
+  --------------------------------------------------------- */
+  var FIN_LABEL = {tt_libre:'TT Libre (CBG3)', liberar:'Liberado', reversar:'Reversado'};
+
+  function reconstruirCiclos(rows){
+    /* rows debe venir ordenado de más viejo a más nuevo */
+    var abiertos = {};
+    var ciclos = [];
+    rows.forEach(function(row){
+      var key = row.programacion_id + '|' + row.tt_codigo;
+      if(row.accion === 'cargar'){
+        if(!abiertos[key]){
+          abiertos[key] = {
+            tt_codigo: row.tt_codigo, origen: row.origen, destino: row.destino,
+            tsCargado: row.created_at, cargadoPor: row.despachado_por,
+            tsSalePuerta1: null, tsEntraPuerta2: null, tsLlegadaCobertizo: null,
+            tsFin: null, finTipo: null, finPor: null
+          };
+        }
+      }else if(row.accion === 'sale_puerta1' || row.accion === 'entra_puerta2' || row.accion === 'llegada_cobertizo'){
+        var c = abiertos[key];
+        if(c){
+          if(row.accion === 'sale_puerta1') c.tsSalePuerta1 = row.created_at;
+          if(row.accion === 'entra_puerta2') c.tsEntraPuerta2 = row.created_at;
+          if(row.accion === 'llegada_cobertizo') c.tsLlegadaCobertizo = row.created_at;
+        }
+      }else if(row.accion === 'tt_libre' || row.accion === 'liberar' || row.accion === 'reversar'){
+        var c2 = abiertos[key];
+        if(c2){
+          c2.tsFin = row.created_at;
+          c2.finTipo = row.accion;
+          c2.finPor = row.despachado_por;
+          ciclos.push(c2);
+          delete abiertos[key];
+        }
+      }
+    });
+    return ciclos;
+  }
+
+  function fmtDuracionISO(isoIni, isoFin){
+    return fmtDuracion(new Date(isoIni).getTime(), new Date(isoFin).getTime());
+  }
+  function fmtHoraISO(iso){
+    var d = new Date(iso);
+    return pad(d.getHours())+':'+pad(d.getMinutes());
+  }
+
+  function renderCiclos(ciclos){
+    var el = document.getElementById('listCiclos');
+    el.innerHTML = '';
+    if(!ciclos.length){
+      el.className = 'empty-inline';
+      el.textContent = 'No hay ningún ciclo completado (TT liberado) en esa fecha.';
+      return;
+    }
+    el.className = '';
+    ciclos.forEach(function(c){
+      var tiemposFmt = {
+        cargado: fmtHoraISO(c.tsCargado),
+        fin: fmtHoraISO(c.tsFin)
+      };
+      var personas = {cargado: c.cargadoPor, fin: (FIN_LABEL[c.finTipo]||c.finTipo)+(c.finPor ? ' · '+c.finPor : '')};
+      var anterior = c.tsCargado;
+      if(c.tsSalePuerta1){ tiemposFmt.sale_puerta1 = fmtHoraISO(c.tsSalePuerta1); tiemposFmt.dur_sale_puerta1 = fmtDuracionISO(anterior, c.tsSalePuerta1); anterior = c.tsSalePuerta1; }
+      if(c.tsEntraPuerta2){ tiemposFmt.entra_puerta2 = fmtHoraISO(c.tsEntraPuerta2); tiemposFmt.dur_entra_puerta2 = fmtDuracionISO(anterior, c.tsEntraPuerta2); anterior = c.tsEntraPuerta2; }
+      if(c.tsLlegadaCobertizo){ tiemposFmt.llegada_cobertizo = fmtHoraISO(c.tsLlegadaCobertizo); tiemposFmt.dur_llegada_cobertizo = fmtDuracionISO(anterior, c.tsLlegadaCobertizo); anterior = c.tsLlegadaCobertizo; }
+      tiemposFmt.dur_fin = fmtDuracionISO(anterior, c.tsFin);
+
+      var pasosHistoricos = [{key:'cargado', label:'Cargado', icon:'&#128230;'}];
+      if(c.tsSalePuerta1) pasosHistoricos.push({key:'sale_puerta1', label:'Puerta 1', icon:'&#128682;'});
+      if(c.tsEntraPuerta2) pasosHistoricos.push({key:'entra_puerta2', label:'Puerta 2', icon:'&#128682;'});
+      if(c.tsLlegadaCobertizo) pasosHistoricos.push({key:'llegada_cobertizo', label:'Cobertizo', icon:'&#127981;'});
+      pasosHistoricos.push({key:'fin', label:'Libre', icon:'&#127937;'});
+
+      var div = document.createElement('div');
+      div.className = 'ciclo-report-card';
+      div.innerHTML =
+        '<div class="rec-head">'+
+          '<div>'+
+            '<div class="route">TT# '+esc(c.tt_codigo)+'</div>'+
+            '<div class="meta">'+esc(c.origen)+' &rarr; '+esc(c.destino)+'</div>'+
+          '</div>'+
+          '<span class="badge atendido">&#9203; Total: '+esc(fmtDuracionISO(c.tsCargado, c.tsFin))+'</span>'+
+        '</div>'+
+        buildCicloTimeline(tiemposFmt, personas, null, pasosHistoricos);
+      el.appendChild(div);
+    });
+  }
+
+  document.getElementById('fCicloFecha').valueAsDate = new Date();
+
+  async function buscarCiclos(){
+    var el = document.getElementById('listCiclos');
+    var fecha = document.getElementById('fCicloFecha').value;
+    var ttFiltro = document.getElementById('fCicloTT').value.trim();
+    if(!fecha){ showToast('Elige una fecha.'); return; }
+    if(!supabaseConfigured || !supabaseClient){
+      el.className = 'empty-inline';
+      el.textContent = 'El reporte de ciclos solo está disponible con Supabase conectado.';
+      return;
+    }
+    el.className = 'empty-inline';
+    el.textContent = 'Buscando…';
+    var desde = fecha + 'T00:00:00';
+    var hasta = fecha + 'T23:59:59.999';
+    try{
+      var q = supabaseClient.from('despachos')
+        .select('*')
+        .gte('created_at', desde)
+        .lte('created_at', hasta)
+        .order('created_at', {ascending: true});
+      if(ttFiltro) q = q.eq('tt_codigo', ttFiltro);
+      var res = await q;
+      if(res.error) throw res.error;
+      var ciclos = reconstruirCiclos(res.data || []);
+      renderCiclos(ciclos);
+    }catch(e){
+      console.error('Error consultando ciclos:', e);
+      el.className = 'empty-inline';
+      el.textContent = 'No se pudo consultar el reporte de ciclos.';
+    }
+  }
+  document.getElementById('btnBuscarCiclos').addEventListener('click', buscarCiclos);
+  document.getElementById('fCicloTT').addEventListener('input', function(){
+    this.value = this.value.replace(/\D/g, '');
+  });
+
   document.getElementById('btnRefreshAdministradorProg').addEventListener('click', function(){ onRecords(lastRecords, true); showToast('Actualizado.'); });
 
   var tabCapturarBtn = document.getElementById('tabCapturarBtn');
@@ -3119,23 +3754,63 @@
   var tabCapturarContent = document.getElementById('tabCapturarContent');
   var tabProgramacionesContent = document.getElementById('tabProgramacionesContent');
 
+  var tabFlujoAdminBtn = document.getElementById('tabFlujoAdminBtn');
+  var tabFlujoAdminContent = document.getElementById('tabFlujoAdminContent');
   function showAdminTab(tab){
-    var esCapturar = tab === 'capturar';
-    tabCapturarContent.style.display = esCapturar ? '' : 'none';
-    tabProgramacionesContent.style.display = esCapturar ? 'none' : '';
-    tabCapturarBtn.classList.toggle('active', esCapturar);
-    tabProgramacionesBtn.classList.toggle('active', !esCapturar);
+    tabCapturarContent.style.display = tab === 'capturar' ? '' : 'none';
+    tabProgramacionesContent.style.display = tab === 'programaciones' ? '' : 'none';
+    tabFlujoAdminContent.style.display = tab === 'flujo' ? '' : 'none';
+    tabCapturarBtn.classList.toggle('active', tab === 'capturar');
+    tabProgramacionesBtn.classList.toggle('active', tab === 'programaciones');
+    tabFlujoAdminBtn.classList.toggle('active', tab === 'flujo');
+    if(tab === 'flujo') renderAllFlujos();
   }
   tabCapturarBtn.addEventListener('click', function(){ showAdminTab('capturar'); });
   tabProgramacionesBtn.addEventListener('click', function(){ showAdminTab('programaciones'); });
+  tabFlujoAdminBtn.addEventListener('click', function(){ showAdminTab('flujo'); });
   document.getElementById('btnRefreshVer').addEventListener('click', function(){ onRecords(lastRecords, true); showToast('Actualizado.'); });
+
+  /* Pestañas de Operativo: Programaciones / Flujo */
+  var tabOpProgramacionesBtn = document.getElementById('tabOpProgramacionesBtn');
+  var tabOpFlujoBtn = document.getElementById('tabOpFlujoBtn');
+  var tabOpProgramacionesContent = document.getElementById('tabOpProgramacionesContent');
+  var tabOpFlujoContent = document.getElementById('tabOpFlujoContent');
+  function showOpTab(tab){
+    var esProg = tab === 'programaciones';
+    tabOpProgramacionesContent.style.display = esProg ? '' : 'none';
+    tabOpFlujoContent.style.display = esProg ? 'none' : '';
+    tabOpProgramacionesBtn.classList.toggle('active', esProg);
+    tabOpFlujoBtn.classList.toggle('active', !esProg);
+    if(!esProg) renderAllFlujos();
+  }
+  tabOpProgramacionesBtn.addEventListener('click', function(){ showOpTab('programaciones'); });
+  tabOpFlujoBtn.addEventListener('click', function(){ showOpTab('flujo'); });
+
+  /* Pestañas de CBG3: CBG3 / Flujo */
+  var tabCbg3ListaBtn = document.getElementById('tabCbg3ListaBtn');
+  var tabCbg3FlujoBtn = document.getElementById('tabCbg3FlujoBtn');
+  var tabCbg3ListaContent = document.getElementById('tabCbg3ListaContent');
+  var tabCbg3FlujoContent = document.getElementById('tabCbg3FlujoContent');
+  function showCbg3Tab(tab){
+    var esLista = tab === 'lista';
+    tabCbg3ListaContent.style.display = esLista ? '' : 'none';
+    tabCbg3FlujoContent.style.display = esLista ? 'none' : '';
+    tabCbg3ListaBtn.classList.toggle('active', esLista);
+    tabCbg3FlujoBtn.classList.toggle('active', !esLista);
+    if(!esLista) renderAllFlujos();
+  }
+  tabCbg3ListaBtn.addEventListener('click', function(){ showCbg3Tab('lista'); });
+  tabCbg3FlujoBtn.addEventListener('click', function(){ showCbg3Tab('flujo'); });
 
   var viewAdmin = document.getElementById('viewAdmin');
   var viewOp = document.getElementById('viewOp');
   var viewVer = document.getElementById('viewVer');
+  var viewPuerta1 = document.getElementById('viewPuerta1');
+  var viewPuerta2 = document.getElementById('viewPuerta2');
+  var viewCbg3 = document.getElementById('viewCbg3');
   var viewGestion = document.getElementById('viewGestion');
 
-  var ROL_LABEL = {admin:'Admin', administrador:'Administrador', operativo:'Operativo', ver:'Ver'};
+  var ROL_LABEL = {admin:'Admin', administrador:'Administrador', operativo:'Operativo', ver:'Ver', puerta1:'Puerta 1', puerta2:'Puerta 2', cbg3:'CBG3'};
 
   var SESSION_KEY = 'spb_session_v1';
   var currentSession = null;
@@ -3157,11 +3832,17 @@
     viewAdmin.style.display = 'none';
     viewOp.style.display = 'none';
     viewVer.style.display = 'none';
+    viewPuerta1.style.display = 'none';
+    viewPuerta2.style.display = 'none';
+    viewCbg3.style.display = 'none';
     viewGestion.style.display = 'none';
 
     if(rol === 'administrador') viewAdmin.style.display = 'block';
     else if(rol === 'operativo') viewOp.style.display = 'block';
     else if(rol === 'ver') viewVer.style.display = 'block';
+    else if(rol === 'puerta1') viewPuerta1.style.display = 'block';
+    else if(rol === 'puerta2') viewPuerta2.style.display = 'block';
+    else if(rol === 'cbg3') viewCbg3.style.display = 'block';
     else viewGestion.style.display = 'block';
   }
 
@@ -3197,6 +3878,9 @@
     viewAdmin.style.display = 'none';
     viewOp.style.display = 'none';
     viewVer.style.display = 'none';
+    viewPuerta1.style.display = 'none';
+    viewPuerta2.style.display = 'none';
+    viewCbg3.style.display = 'none';
     viewGestion.style.display = 'none';
     hideAppLoading();
     document.getElementById('loginOverlay').style.display = 'flex';
@@ -3360,6 +4044,10 @@
 
   document.getElementById('correoCargueToggle').addEventListener('click', function(){
     document.getElementById('correoCargueToggle').parentElement.classList.toggle('collapsed');
+  });
+
+  document.getElementById('estacionesToggle').addEventListener('click', function(){
+    document.getElementById('estacionesToggle').parentElement.classList.toggle('collapsed');
   });
 
   document.getElementById('gestionUsuariosToggle').addEventListener('click', function(){
@@ -3531,6 +4219,7 @@
     subscribeRecords(onRecords);
     subscribeUsuarios(handleUsuariosSnapshot);
     initConfigEmail();
+    initConfigEstaciones();
   });
 
 })();
